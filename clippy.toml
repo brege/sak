@@ -1,0 +1,11 @@
+doc-valid-idents = [
+  "GitHub",
+  "Rust",
+  "SSH",
+  "SQLite",
+  "restic",
+  "gitignore",
+  "ilma",
+  "sak",
+  "..",
+]
