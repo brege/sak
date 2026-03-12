@@ -10,6 +10,9 @@ Take advantage of the fact very little of the wheel needs to be re-invented. Rus
 
 - figure out how to efficiently index the remote's file tree and store it locally in the same restic/rustic native format
 
-### Rustic vs. Restic
+### References
 
-https://rustic.cli.rs/docs/comparison-restic.html
+- [Restic Source](https://github.com/restic/restic)
+- [Rustic Source](https://github.com/rustic-rs/rustic)
+- [Comparison of Rustic vs. Restic](https://rustic.cli.rs/docs/comparison-restic.html)
+

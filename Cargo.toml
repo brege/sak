@@ -6,14 +6,20 @@ rust-version = "1.93"
 
 [dependencies]
 anyhow = "1.0.100"
+bytesize = "2.3.0"
 clap = { version = "4.5.60", features = ["derive"] }
 ignore = "0.4.25"
+indicatif = "0.18.0"
+log = "0.4.29"
+opendal = { version = "0.55.0", features = ["blocking", "services-fs", "services-sftp", "layers-throttle"] }
 rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-rustic_backend = "0.6.1"
-rustic_core = "0.10.1"
+rustic_backend = { path = "refs/rustic_core/crates/backend" }
+rustic_core = { path = "refs/rustic_core/crates/core" }
+simplelog = "0.12.2"
 tempfile = "3.23.0"
+tokio = { version = "1.49.0", default-features = false, features = ["rt-multi-thread"] }
 walkdir = "2.5.0"
 
 [dev-dependencies]

@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use sak::{ImportOptions, import_local_tree};
+use sak::{ImportOptions, SourceSpec, import_local_tree, init_logging};
 
 #[derive(Debug, Parser)]
 #[command(name = "sak")]
@@ -22,7 +22,7 @@ struct ImportArgs {
     repo: PathBuf,
 
     #[arg(long)]
-    source: PathBuf,
+    source: String,
 
     #[arg(long)]
     snapshot_path: PathBuf,
@@ -44,6 +44,7 @@ struct ImportArgs {
 }
 
 fn main() -> Result<()> {
+    init_logging();
     let cli = Cli::parse();
 
     match cli.command {
@@ -55,7 +56,7 @@ fn run_import(args: ImportArgs) -> Result<()> {
     let password = read_password(args.password, args.password_file.as_deref())?;
     let snapshot = import_local_tree(&ImportOptions {
         repo: args.repo,
-        source: args.source,
+        source: args.source.parse::<SourceSpec>()?,
         snapshot_path: args.snapshot_path,
         password,
         host: args.host,
