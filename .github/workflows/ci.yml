@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: fetch rustic fixtures
+        run: git clone --depth=1 https://github.com/rustic-rs/rustic refs/rustic
+
+      - name: install restic
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes restic
+
+      - name: run tests
+        run: cargo test --locked
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+
+      - name: install rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: install pre-commit
+        uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --all-files

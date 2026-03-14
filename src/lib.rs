@@ -372,7 +372,7 @@ fn best_override_match<'a>(
 
     match (full.is_none(), rel) {
         (false, Some(matched)) if matched.is_whitelist() => Some(matched),
-        (false, Some(matched)) if full.is_whitelist() => Some(full),
+        (false, Some(_)) if full.is_whitelist() => Some(full),
         (false, Some(matched)) if matched.is_ignore() => Some(matched),
         (false, Some(_)) if full.is_ignore() => Some(full),
         (false, _) => Some(full),

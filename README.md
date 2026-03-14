@@ -6,7 +6,7 @@
 
 Restic is designed to backup data on the Restic's runtime machine to a remote repository, typically through SSH using Zstd compression, AES-256 encryption, de-duplicating backups and snapshotting for fast and efficient storage retrieval.  It's an impressive stack.
 
-Sak uses [`rustic\_core`](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local restic repository.
+Sak uses [`rustic_core`](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local restic repository.
 
 ## Restic vs. Sak
 
