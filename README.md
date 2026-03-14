@@ -8,7 +8,7 @@ Restic is designed to backup data on the Restic's runtime machine to a remote re
 
 Sak uses [`rustic_core`](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local restic repository.
 
-## Restic vs. Sak
+## Topology
 
 ![paradigms](img/paradigms.svg)
 
@@ -105,14 +105,15 @@ restic --repo ~/Backups/MiniPC \
 - [Rustic Core](https://github.com/rustic-rs/rustic_core)
 - [Comparison of Rustic vs. Restic](https://rustic.cli.rs/docs/comparison-restic.html)
 
-## Related
+## Related Projects
 
-Related projects of mine:
+###  [**dil**](https://github.com/brege/dil)
 
-- [**dil**](https://github.com/brege/dil)
-  · find and clean project litter like node\_modules, \_\_pycache\_\_, \*.aux, etc.
-- [ilma](https://github.com/brege/ilma)
-  · multi-Linux machine encrypted snapshot manager in Bash (zst, tar, rsync, gpg)
+[dil](https://github.com/brege/dil) finds and cleans project litter leftover from coding builds like `node_modules`, `__pycache__`, the LaTeX cruft `*.aux`, `.synctex.gz`, etc, and many other languages and frameworks. 
+
+### [**ilma**](https://github.com/brege/ilma)
+
+[ilma](https://github.com/brege/ilma) is/was an over-engineered Bash script for multi-Linux machine encrypted backups using monolithic archives (zst, tar, rsync, gpg). No de-duplication, but the spiritual pre-cursor to building sak.
 
 ## License
 
