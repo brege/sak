@@ -8,7 +8,9 @@ use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
 use opendal::blocking::Operator as BlockingOperator;
 use rustic_backend::BackendOptions;
-use rustic_core::{Credentials, Repository, RepositoryOptions};
+use rustic_core::{
+    Credentials, Excludes, LocalSourceFilterOptions, ReadSource, Repository, RepositoryOptions,
+};
 use sak::{RemoteSource, RemoteSourceReader, SourceSpec};
 use tar::Archive;
 use tempfile::{TempDir, tempdir};
@@ -41,7 +43,12 @@ fn remote_source_reader_imports_without_staging() -> Result<()> {
         host: "beelink".to_string(),
         path: "src".to_string(),
     };
-    let reader = RemoteSourceReader::with_operator(remote, fs_operator(&remote_root)?)?;
+    let reader = RemoteSourceReader::with_operator(
+        remote,
+        fs_operator(&remote_root)?,
+        Excludes::default(),
+        LocalSourceFilterOptions::default(),
+    )?;
 
     let credentials = Credentials::password(PASSWORD);
     let repo = open_or_init_repo(&repo_path, &credentials)?.to_indexed_ids()?;
@@ -68,6 +75,45 @@ fn remote_source_reader_imports_without_staging() -> Result<()> {
     let repo = open_repo(&repo_path)?;
     let snapshots = repo.get_all_snapshots()?;
     assert_eq!(snapshots.len(), 1);
+
+    Ok(())
+}
+
+#[test]
+fn remote_source_reader_applies_glob_files() -> Result<()> {
+    let workspace = tempdir()?;
+    let remote_root = unpack_src_snapshot(&workspace)?;
+    let glob_file = workspace.path().join("exclude.txt");
+    fs::write(&glob_file, "!src/commands/**\n")?;
+
+    let remote = RemoteSource {
+        host: "beelink".to_string(),
+        path: "src".to_string(),
+    };
+    let reader = RemoteSourceReader::with_operator(
+        remote,
+        fs_operator(&remote_root)?,
+        {
+            let mut excludes = Excludes::default();
+            excludes.glob_files = vec![glob_file.display().to_string()];
+            excludes
+        },
+        LocalSourceFilterOptions::default(),
+    )?;
+
+    let paths = reader
+        .entries()
+        .collect::<rustic_core::RusticResult<Vec<_>>>()?
+        .into_iter()
+        .map(|entry| entry.path)
+        .collect::<Vec<_>>();
+
+    assert!(paths.iter().any(|path| path.ends_with("bin/rustic.rs")));
+    assert!(
+        !paths
+            .iter()
+            .any(|path| path.ends_with("commands/backup.rs"))
+    );
 
     Ok(())
 }

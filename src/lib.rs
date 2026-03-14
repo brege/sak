@@ -9,6 +9,10 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use ignore::{
+    Match,
+    overrides::{Override, OverrideBuilder},
+};
 use opendal::{
     EntryMode,
     blocking::{Operator as BlockingOperator, StdReader},
@@ -17,9 +21,9 @@ use opendal::{
 };
 use rustic_backend::BackendOptions;
 use rustic_core::{
-    BackupOptions, ConfigOptions, Credentials, ErrorKind, KeyOptions, PathList, ReadSource,
-    ReadSourceEntry, ReadSourceOpen, Repository, RepositoryOptions, RusticError, RusticResult,
-    SnapshotOptions,
+    BackupOptions, ConfigOptions, Credentials, ErrorKind, Excludes, KeyOptions,
+    LocalSourceFilterOptions, PathList, ReadSource, ReadSourceEntry, ReadSourceOpen, Repository,
+    RepositoryOptions, RusticError, RusticResult, SnapshotOptions,
     node::{Metadata, Node, NodeType},
     repofile::SnapshotFile,
 };
@@ -32,11 +36,9 @@ pub use progress::init_logging;
 pub struct ImportOptions {
     pub repo: PathBuf,
     pub source: SourceSpec,
-    pub snapshot_path: PathBuf,
     pub password: String,
-    pub host: Option<String>,
-    pub label: Option<String>,
-    pub tags: Vec<String>,
+    pub backup: BackupOptions,
+    pub snapshot: SnapshotOptions,
 }
 
 pub fn import_local_tree(opts: &ImportOptions) -> Result<SnapshotFile> {
@@ -50,24 +52,20 @@ fn import_local_path(opts: &ImportOptions, source_path: &Path) -> Result<Snapsho
     let credentials = Credentials::password(&opts.password);
     let repo = open_or_init_repo(&opts.repo, &credentials)?.to_indexed_ids()?;
     let source = path_list(source_path)?;
-
-    let mut backup_opts = BackupOptions::default();
-    backup_opts.as_path = Some(opts.snapshot_path.clone());
-
-    let snap = snapshot_options(opts)?.to_snapshot()?;
-    Ok(repo.backup(&backup_opts, &source, snap)?)
+    let snap = opts.snapshot.to_snapshot()?;
+    Ok(repo.backup(&opts.backup, &source, snap)?)
 }
 
 fn import_remote_path(opts: &ImportOptions, remote: &RemoteSource) -> Result<SnapshotFile> {
     let credentials = Credentials::password(&opts.password);
     let repo = open_or_init_repo(&opts.repo, &credentials)?.to_indexed_ids()?;
-    let source = RemoteSourceReader::new(remote.clone())?;
-
-    let mut backup_opts = BackupOptions::default();
-    backup_opts.as_path = Some(opts.snapshot_path.clone());
-
-    let snap = snapshot_options(opts)?.to_snapshot()?;
-    Ok(repo.backup_source(&backup_opts, source.backup_root(), &source, snap)?)
+    let source = RemoteSourceReader::new(
+        remote.clone(),
+        opts.backup.excludes.clone(),
+        opts.backup.ignore_filter_opts.clone(),
+    )?;
+    let snap = opts.snapshot.to_snapshot()?;
+    Ok(repo.backup_source(&opts.backup, source.backup_root(), &source, snap)?)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,13 +84,14 @@ impl FromStr for SourceSpec {
     type Err = anyhow::Error;
 
     fn from_str(value: &str) -> Result<Self> {
-        if let Some((host, path)) = value.split_once(':') {
-            if is_remote_host(host) && !path.is_empty() {
-                return Ok(Self::Remote(RemoteSource {
-                    host: host.to_string(),
-                    path: path.to_string(),
-                }));
-            }
+        if let Some((host, path)) = value.split_once(':')
+            && is_remote_host(host)
+            && !path.is_empty()
+        {
+            return Ok(Self::Remote(RemoteSource {
+                host: host.to_string(),
+                path: path.to_string(),
+            }));
         }
 
         Ok(Self::Local(PathBuf::from(value)))
@@ -123,14 +122,23 @@ pub struct RemoteSourceReader {
 }
 
 impl RemoteSourceReader {
-    pub fn new(remote: RemoteSource) -> Result<Self> {
+    pub fn new(
+        remote: RemoteSource,
+        excludes: Excludes,
+        filter_opts: LocalSourceFilterOptions,
+    ) -> Result<Self> {
         let op = Arc::new(remote_operator(&remote)?);
-        Self::with_operator(remote, op)
+        Self::with_operator(remote, op, excludes, filter_opts)
     }
 
-    pub fn with_operator(remote: RemoteSource, op: Arc<BlockingOperator>) -> Result<Self> {
+    pub fn with_operator(
+        remote: RemoteSource,
+        op: Arc<BlockingOperator>,
+        excludes: Excludes,
+        filter_opts: LocalSourceFilterOptions,
+    ) -> Result<Self> {
         let root = remote.root_path()?;
-        let entries = collect_remote_entries(op, &remote, &root)?;
+        let entries = collect_remote_entries(op, &remote, &root, &excludes, &filter_opts)?;
         let size = entries
             .iter()
             .filter(|entry| matches!(entry.node.node_type, NodeType::File))
@@ -207,18 +215,20 @@ fn collect_remote_entries(
     op: Arc<BlockingOperator>,
     remote: &RemoteSource,
     root: &Path,
+    excludes: &Excludes,
+    filter_opts: &LocalSourceFilterOptions,
 ) -> Result<Vec<RemoteEntry>> {
     let stat = op
         .stat(&remote.path)
         .with_context(|| format!("failed to stat remote path {}", remote.path))?;
+    let filters = build_remote_filters(excludes, filter_opts)?;
 
     if stat.is_file() {
-        return Ok(vec![remote_file_entry(
-            op,
-            root.to_path_buf(),
-            remote.path.clone(),
-            &stat,
-        )?]);
+        let entry = remote_file_entry(op, root.to_path_buf(), remote.path.clone(), &stat)?;
+        return Ok(include_remote_entry(&entry, root, &filters, &[])
+            .then_some(entry)
+            .into_iter()
+            .collect());
     }
 
     if !stat.is_dir() {
@@ -226,7 +236,7 @@ fn collect_remote_entries(
     }
 
     let root_path = remote_dir_path(&remote.path);
-    let mut entries = op
+    let entries = op
         .list_options(
             &root_path,
             ListOptions {
@@ -249,8 +259,150 @@ fn collect_remote_entries(
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let excluded_dirs = excluded_remote_dirs(&entries, root, &filters.exclude_if_present);
+    let mut entries = entries
+        .into_iter()
+        .filter(|entry| include_remote_entry(entry, root, &filters, &excluded_dirs))
+        .collect::<Vec<_>>();
+
     entries.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(entries)
+}
+
+fn build_remote_filters(
+    excludes: &Excludes,
+    filter_opts: &LocalSourceFilterOptions,
+) -> Result<RemoteFilters> {
+    if filter_opts.git_ignore {
+        bail!("remote imports do not support git-ignore yet");
+    }
+    if filter_opts.no_require_git {
+        bail!("remote imports do not support no-require-git yet");
+    }
+    if !filter_opts.custom_ignorefiles.is_empty() {
+        bail!("remote imports do not support custom-ignorefile yet");
+    }
+    if filter_opts.one_file_system {
+        bail!("remote imports do not support one-file-system yet");
+    }
+
+    let mut builder = OverrideBuilder::new("");
+
+    for glob in &excludes.globs {
+        builder
+            .add(glob)
+            .with_context(|| format!("failed to add glob pattern {glob}"))?;
+    }
+
+    for file in &excludes.glob_files {
+        let content =
+            fs::read_to_string(file).with_context(|| format!("failed to read glob file {file}"))?;
+        for line in content.lines() {
+            builder
+                .add(line)
+                .with_context(|| format!("failed to add glob pattern line {line} from {file}"))?;
+        }
+    }
+
+    builder
+        .case_insensitive(true)
+        .context("failed to enable case-insensitive matching for iglob and iglob-file patterns")?;
+
+    for glob in &excludes.iglobs {
+        builder
+            .add(glob)
+            .with_context(|| format!("failed to add iglob pattern {glob}"))?;
+    }
+
+    for file in &excludes.iglob_files {
+        let content = fs::read_to_string(file)
+            .with_context(|| format!("failed to read iglob file {file}"))?;
+        for line in content.lines() {
+            builder
+                .add(line)
+                .with_context(|| format!("failed to add iglob pattern line {line} from {file}"))?;
+        }
+    }
+
+    Ok(RemoteFilters {
+        overrides: builder.build().context("failed to build glob overrides")?,
+        exclude_if_present: filter_opts.exclude_if_present.clone(),
+        exclude_larger_than: filter_opts.exclude_larger_than.map(|size| size.as_u64()),
+    })
+}
+
+fn include_remote_entry(
+    entry: &RemoteEntry,
+    root: &Path,
+    filters: &RemoteFilters,
+    excluded_dirs: &[PathBuf],
+) -> bool {
+    if excluded_dirs
+        .iter()
+        .any(|dir| is_under(entry.path.as_path(), dir))
+    {
+        return false;
+    }
+    if let Some(limit) = filters.exclude_larger_than
+        && entry.node.node_type == NodeType::File
+        && entry.node.meta.size > limit
+    {
+        return false;
+    }
+
+    match best_override_match(entry, root, &filters.overrides) {
+        Some(matched) if matched.is_whitelist() => true,
+        Some(matched) if matched.is_ignore() => false,
+        _ => true,
+    }
+}
+
+fn best_override_match<'a>(
+    entry: &'a RemoteEntry,
+    root: &Path,
+    overrides: &'a Override,
+) -> Option<Match<ignore::overrides::Glob<'a>>> {
+    let is_dir = entry.node.node_type == NodeType::Dir;
+    let full = overrides.matched(&entry.path, is_dir);
+    let rel = entry
+        .path
+        .strip_prefix(root)
+        .ok()
+        .map(|path| overrides.matched(path, is_dir));
+
+    match (full.is_none(), rel) {
+        (false, Some(matched)) if matched.is_whitelist() => Some(matched),
+        (false, Some(matched)) if full.is_whitelist() => Some(full),
+        (false, Some(matched)) if matched.is_ignore() => Some(matched),
+        (false, Some(_)) if full.is_ignore() => Some(full),
+        (false, _) => Some(full),
+        (true, Some(matched)) if !matched.is_none() => Some(matched),
+        _ => None,
+    }
+}
+
+fn excluded_remote_dirs(entries: &[RemoteEntry], root: &Path, markers: &[String]) -> Vec<PathBuf> {
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let name = entry.path.file_name()?.to_str()?;
+            if !markers.iter().any(|marker| marker == name) {
+                return None;
+            }
+            let parent = entry.path.parent()?;
+            Some(
+                parent
+                    .strip_prefix(root)
+                    .ok()
+                    .map(|rel| root.join(rel))
+                    .unwrap_or_else(|| parent.to_path_buf()),
+            )
+        })
+        .collect()
+}
+
+fn is_under(path: &Path, dir: &Path) -> bool {
+    path == dir || path.starts_with(dir)
 }
 
 fn remote_file_entry(
@@ -427,19 +579,6 @@ fn runtime() -> &'static tokio::runtime::Runtime {
     })
 }
 
-fn snapshot_options(opts: &ImportOptions) -> Result<SnapshotOptions> {
-    let mut snap = SnapshotOptions::default();
-    snap.host = opts.host.clone();
-    snap.label = opts.label.clone();
-    snap.command = Some("sak import".to_string());
-
-    for tag in &opts.tags {
-        snap = snap.add_tags(tag)?;
-    }
-
-    Ok(snap)
-}
-
 fn path_list(path: &Path) -> Result<PathList> {
     let path = path
         .to_str()
@@ -481,4 +620,11 @@ fn unopened_repo(repo: &Path) -> Result<Repository<()>> {
         &backends,
         UiProgress,
     )?)
+}
+
+#[derive(Debug, Clone)]
+struct RemoteFilters {
+    overrides: Override,
+    exclude_if_present: Vec<String>,
+    exclude_larger_than: Option<u64>,
 }

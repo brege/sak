@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.93"
 
+[lib]
+doctest = false
+
 [dependencies]
 anyhow = "1.0.100"
 bytesize = "2.3.0"
@@ -16,7 +19,7 @@ rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 rustic_backend = { git = "https://github.com/brege/rustic_core.git", rev = "84add30", package = "rustic_backend" }
-rustic_core = { git = "https://github.com/brege/rustic_core.git", rev = "84add30", package = "rustic_core" }
+rustic_core = { git = "https://github.com/brege/rustic_core.git", rev = "84add30", package = "rustic_core", features = ["clap"] }
 simplelog = "0.12.2"
 tempfile = "3.23.0"
 tokio = { version = "1.49.0", default-features = false, features = ["rt-multi-thread"] }

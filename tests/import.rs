@@ -99,7 +99,7 @@ fn run_sak_import(repo: &Path, source: &Path) -> Result<()> {
         .arg(repo)
         .arg("--source")
         .arg(source)
-        .arg("--snapshot-path")
+        .arg("--as-path")
         .arg("src")
         .arg("--host")
         .arg("fixture-host")

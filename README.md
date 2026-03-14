@@ -6,7 +6,7 @@
 
 Restic is designed to backup data on the Restic's runtime machine to a remote repository, typically through SSH using Zstd compression, AES-256 encryption, de-duplicating backups and snapshotting for fast and efficient storage retrieval.  It's an impressive stack.
 
-Sak works on the back of [`rustic\_core`](https://github.com/rustic-rs/rustic_core) (my minimal [fork](https://github.com/brege/rustic_core)) but in the other direction.
+Sak uses [`rustic\_core`](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local restic repository.
 
 ## Restic vs. Sak
 
@@ -15,6 +15,42 @@ Sak works on the back of [`rustic\_core`](https://github.com/rustic-rs/rustic_co
 ## Usage
 
 This example uses the device topology of the diagram.
+
+The normal `restic` pattern is a fixed include list and a fixed exclude list.
+
+`includes.txt`
+
+```text
+/home/user/Documents
+/home/user/Pictures
+/home/user/.config
+/home/user/.mozilla
+```
+
+`excludes.txt`
+
+```text
+# picture thumbnails
+/home/user/Pictures/**/Thumbs.db
+
+# .mozilla
+/home/user/.mozilla/firefox/*/cache2/**
+/home/user/.mozilla/firefox/*/thumbnails/**
+/home/user/.mozilla/firefox/crashreports/**
+```
+
+Then `restic` backs up that local source set into a repository.
+
+```bash
+restic --repo /path/to/repo \
+    --password-file /path/to/repo/.restic-pass \
+    backup \
+    --files-from includes.txt \
+    --exclude-file excludes.txt
+```
+
+`sak` follows the same idea, but the source set lives on the remote machine
+and the repository lives on the laptop.
 
 Install `sak` from GitHub.
 
@@ -28,7 +64,7 @@ Pull `appdata` from `MiniPC` into the local `Unraid` backup repository.
 sak import \
     --repo ~/Backups/Unraid \
     --source MiniPC:/mnt/user/appdata \
-    --snapshot-path appdata \
+    --as-path appdata \
     --host MiniPC \
     --password-file ~/Backups/Unraid/.sak-pass
 ```
@@ -39,7 +75,7 @@ Pull `music` from `Unraid` into the local `MiniPC` backup repository.
 sak import \
     --repo ~/Backups/MiniPC \
     --source Unraid:/srv/music \
-    --snapshot-path music \
+    --as-path music \
     --host Unraid \
     --password-file ~/Backups/MiniPC/.sak-pass
 ```
@@ -47,13 +83,17 @@ sak import \
 List snapshots in the local `Unraid` backup repository.
 
 ```bash
-restic --repo ~/Backups/Unraid snapshots
+restic --repo ~/Backups/Unraid \
+    --password-file ~/Backups/Unraid/.sak-pass \
+    snapshots
 ```
 
 Inspect the latest snapshot in the local `MiniPC` backup repository.
 
 ```bash
-restic --repo ~/Backups/MiniPC ls latest
+restic --repo ~/Backups/MiniPC \
+    --password-file ~/Backups/MiniPC/.sak-pass \
+    ls latest
 ```
 
 `rustic` can be used interchangeably with `restic` for these checks.

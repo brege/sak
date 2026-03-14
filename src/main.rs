@@ -2,6 +2,7 @@ use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
+use rustic_core::{BackupOptions, SnapshotOptions};
 use sak::{ImportOptions, SourceSpec, import_local_tree, init_logging};
 
 #[derive(Debug, Parser)]
@@ -24,17 +25,11 @@ struct ImportArgs {
     #[arg(long)]
     source: String,
 
-    #[arg(long)]
-    snapshot_path: PathBuf,
+    #[command(flatten)]
+    backup: BackupOptions,
 
-    #[arg(long)]
-    host: Option<String>,
-
-    #[arg(long)]
-    label: Option<String>,
-
-    #[arg(long = "tag")]
-    tags: Vec<String>,
+    #[command(flatten)]
+    snapshot: SnapshotOptions,
 
     #[arg(long, conflicts_with = "password_file")]
     password: Option<String>,
@@ -54,14 +49,17 @@ fn main() -> Result<()> {
 
 fn run_import(args: ImportArgs) -> Result<()> {
     let password = read_password(args.password, args.password_file.as_deref())?;
+    let mut snapshot = args.snapshot;
+    if snapshot.command.is_none() {
+        snapshot.command = Some("sak import".to_string());
+    }
+
     let snapshot = import_local_tree(&ImportOptions {
         repo: args.repo,
         source: args.source.parse::<SourceSpec>()?,
-        snapshot_path: args.snapshot_path,
         password,
-        host: args.host,
-        label: args.label,
-        tags: args.tags,
+        backup: args.backup,
+        snapshot,
     })?;
 
     println!("{}", snapshot.id);
