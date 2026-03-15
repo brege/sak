@@ -22,16 +22,16 @@ cargo install --git https://github.com/brege/sak --bin sak
 
 ## Usage
 
-### Rustic Pattern
-
 This example uses the device topology of the diagram above. We are backing up two machines, Unraid and MiniPC, and the Laptop is the destination for the backups from which you run Sak.
 
-Rustic keeps sources and filter patterns in TOML: 
+### Rustic Paradigm
 
-- `sources` is a list of paths to back up
-- `globs` is a separate list of filter patterns applied during traversal
+Rustic, and Restic, are ran from the source machine (in this example, Laptop) and backups its data to a remote repository. What gets backed up is defined in a configuration TOML file containing
 
-Backing up the Laptop's data to some remote using a config file, `~/.config/rustic/laptop.toml`:
+- `sources`, a list of paths to back up
+- `globs`, a separate list of filter patterns applied during traversal
+
+Backing up the Laptop's data to some remote using a config file, say `~/.config/rustic/laptop.toml`, can look like:
 
 ```toml
 [repository]
@@ -59,63 +59,63 @@ Lines in `globs` without a `!` prefix are explicit includes; lines with `!` are 
 
 ### Sak Pattern
 
-`sak` uses the same TOML shape, but the source lives on a remote host and the repository lives on the laptop.
+But what if you have multiple machines whose configs and databases need to be backed up periodically? This is time-hard data that's difficult to reproduce. Headless Linux distros are typically SSH server enabled at genesis, while devices like Linux laptops often do not have an SSH server enabled. Plus, a laptop is not "always on", so even if you did setup an SSH server on your laptop for your servers to Rustic-backup to, they cannot rely on your laptop being alive to perform the backup.
+
+This is what I made **sak** for. Sak uses all of Rustic's features, the same TOML manifests as above, but the source lives on a remote host and the repository lives on the laptop. Your laptop can the pull Rustic backups at will.
 
 Keep one local repository per remote host.
 
 ```bash
-mkdir --parents ~/Backups/MiniPC ~/Backups/Unraid
+mkdir -p ~/Backups/MiniPC ~/Backups/Unraid
 ```
 
 Keep the source set beside each local repository in the same shape.
 
 1. `~/Backups/Unraid/sak.toml`
 
-```toml
-[repository]
-repository = "~/Backups/Unraid"
-password-file = "~/Backups/Unraid/.sak-pass"
+    ```toml
+    [repository]
+    repository = "~/Backups/Unraid"
+    password-file = "~/Backups/Unraid/.sak-pass"
 
-[[backup.snapshots]]
-sources = [
-    "Unraid:/.config",
-    "Unraid:/db.sqlite3",
-    "Unraid:/etc/nginx",
-    "Unraid:/LinuxISOs",
-]
-globs = [
-    "!**/.cache",
-    "!**/*.tmp",
-    "!**/*.log",
-]
-```
+    [[backup.snapshots]]
+    sources = [
+        "Unraid:/.config",
+        "Unraid:/db.sqlite3",
+        "Unraid:/etc/nginx",
+        "Unraid:/LinuxISOs",
+    ]
+    globs = [
+        "!**/.cache",
+        "!**/*.tmp",
+        "!**/*.log",
+    ]
+    ```
 
 2. `~/Backups/MiniPC/sak.toml`
 
-```toml
-[repository]
-repository = "~/Backups/MiniPC"
-password-file = "~/Backups/MiniPC/.sak-pass"
+    ```toml
+    [repository]
+    repository = "~/Backups/MiniPC"
+    password-file = "~/Backups/MiniPC/.sak-pass"
 
-[[backup.snapshots]]
-sources = [
-    "MiniPC:/mnt/user/appdata",
-    "MiniPC:/var/lib/plexmediaserver",
-    "MiniPC:/boot/config",
-    "MiniPC:/docker",
-]
-globs = [
-    "!/mnt/user/appdata/**/cache",
-    "!/mnt/user/appdata/**/Cache",
-    "!/mnt/user/appdata/**/logs",
-    "!/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Cache",
-    "!**/*.tmp",
-]
-```
+    [[backup.snapshots]]
+    sources = [
+        "MiniPC:/mnt/user/appdata",
+        "MiniPC:/var/lib/plexmediaserver",
+        "MiniPC:/boot/config",
+        "MiniPC:/docker",
+    ]
+    globs = [
+        "!/mnt/user/appdata/**/cache",
+        "!/mnt/user/appdata/**/Cache",
+        "!/mnt/user/appdata/**/logs",
+        "!/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Cache",
+        "!**/*.tmp",
+    ]
+    ```
 
-The host prefix on each source path (`MiniPC:`, `Unraid:`) is the only
-structural difference from a standard rustic config. The `globs` key behaves
-identically in both tools.
+The host prefix on each source path, `MiniPC:` and `Unraid:`, is the only structural difference from a standard rustic config. The `globs` key behaves identically in both tools.
 
 ### Inspect
 
