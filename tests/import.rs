@@ -92,10 +92,51 @@ fn imported_fixture_restores_with_restic() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn backup_config_imports_all_sources() -> Result<()> {
+    let workspace = tempdir()?;
+    let source_root = unpack_src_snapshot(&workspace)?;
+    let repo = workspace.path().join("repo");
+    let password_file = workspace.path().join("repo.pass");
+    let config = workspace.path().join("sak.toml");
+    let source_a = source_root.join("src/bin");
+    let source_b = source_root.join("src/commands/backup.rs");
+
+    fs::write(&password_file, format!("{PASSWORD}\n"))?;
+    fs::write(
+        &config,
+        format!(
+            "[repository]\nrepository = \"{}\"\npassword-file = \"{}\"\n\n[[backup.snapshots]]\nsources = [\"{}\", \"{}\"]\nlabel = \"fixture\"\ntags = [\"fixture\"]\n",
+            repo.display(),
+            password_file.display(),
+            source_a.display(),
+            source_b.display(),
+        ),
+    )?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_sak"))
+        .arg("backup")
+        .arg("--config")
+        .arg(&config)
+        .output()
+        .context("failed to run sak backup")?;
+    if !output.status.success() {
+        bail!(
+            "sak backup failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let snapshots = snapshots(&repo)?;
+    assert_eq!(snapshots.len(), 2);
+
+    Ok(())
+}
+
 fn run_sak_import(repo: &Path, source: &Path) -> Result<()> {
     let output = Command::new(env!("CARGO_BIN_EXE_sak"))
         .arg("import")
-        .arg("--repo")
+        .arg("--repository")
         .arg(repo)
         .arg("--source")
         .arg(source)

@@ -21,7 +21,7 @@ use opendal::{
 };
 use rustic_backend::BackendOptions;
 use rustic_core::{
-    BackupOptions, ConfigOptions, Credentials, ErrorKind, Excludes, KeyOptions,
+    BackupOptions, ConfigOptions, CredentialOptions, ErrorKind, Excludes, KeyOptions,
     LocalSourceFilterOptions, PathList, ReadSource, ReadSourceEntry, ReadSourceOpen, Repository,
     RepositoryOptions, RusticError, RusticResult, SnapshotOptions,
     node::{Metadata, Node, NodeType},
@@ -34,9 +34,10 @@ pub use progress::init_logging;
 
 #[derive(Debug, Clone)]
 pub struct ImportOptions {
-    pub repo: PathBuf,
+    pub backend_opts: BackendOptions,
+    pub repo_opts: RepositoryOptions,
+    pub credential_opts: CredentialOptions,
     pub source: SourceSpec,
-    pub password: String,
     pub backup: BackupOptions,
     pub snapshot: SnapshotOptions,
 }
@@ -49,16 +50,16 @@ pub fn import_local_tree(opts: &ImportOptions) -> Result<SnapshotFile> {
 }
 
 fn import_local_path(opts: &ImportOptions, source_path: &Path) -> Result<SnapshotFile> {
-    let credentials = Credentials::password(&opts.password);
-    let repo = open_or_init_repo(&opts.repo, &credentials)?.to_indexed_ids()?;
+    let repo = open_or_init_repo(&opts.backend_opts, &opts.repo_opts, &opts.credential_opts)?
+        .to_indexed_ids()?;
     let source = path_list(source_path)?;
     let snap = opts.snapshot.to_snapshot()?;
     Ok(repo.backup(&opts.backup, &source, snap)?)
 }
 
 fn import_remote_path(opts: &ImportOptions, remote: &RemoteSource) -> Result<SnapshotFile> {
-    let credentials = Credentials::password(&opts.password);
-    let repo = open_or_init_repo(&opts.repo, &credentials)?.to_indexed_ids()?;
+    let repo = open_or_init_repo(&opts.backend_opts, &opts.repo_opts, &opts.credential_opts)?
+        .to_indexed_ids()?;
     let source = RemoteSourceReader::new(
         remote.clone(),
         opts.backup.excludes.clone(),
@@ -587,39 +588,31 @@ fn path_list(path: &Path) -> Result<PathList> {
 }
 
 fn open_or_init_repo(
-    repo: &Path,
-    credentials: &Credentials,
+    backend_opts: &BackendOptions,
+    repo_opts: &RepositoryOptions,
+    credential_opts: &CredentialOptions,
 ) -> Result<Repository<rustic_core::OpenStatus>> {
-    fs::create_dir_all(repo)
-        .with_context(|| format!("failed to create repository dir {}", repo.display()))?;
+    let repo_path = backend_opts
+        .repository
+        .as_deref()
+        .context("repository path required")?;
+    fs::create_dir_all(repo_path)
+        .with_context(|| format!("failed to create repository dir {repo_path}"))?;
 
-    let repo = unopened_repo(repo)?;
+    let credentials = credential_opts
+        .credentials()?
+        .context("repository credentials required")?;
+    let backends = backend_opts.to_backends()?;
+    let repo = Repository::new_with_progress(repo_opts, &backends, UiProgress)?;
     if repo.config_id()?.is_none() {
         Ok(repo.init(
-            credentials,
+            &credentials,
             &KeyOptions::default(),
             &ConfigOptions::default(),
         )?)
     } else {
-        Ok(repo.open(credentials)?)
+        Ok(repo.open(&credentials)?)
     }
-}
-
-fn unopened_repo(repo: &Path) -> Result<Repository<()>> {
-    if repo.as_os_str().is_empty() {
-        bail!("repository path must not be empty");
-    }
-
-    let repo = repo
-        .to_str()
-        .with_context(|| format!("repository path is not valid UTF-8: {}", repo.display()))?;
-    let backends = BackendOptions::default().repository(repo).to_backends()?;
-
-    Ok(Repository::new_with_progress(
-        &RepositoryOptions::default(),
-        &backends,
-        UiProgress,
-    )?)
 }
 
 #[derive(Debug, Clone)]

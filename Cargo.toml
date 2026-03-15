@@ -18,11 +18,12 @@ opendal = { version = "0.55.0", features = ["blocking", "services-fs", "services
 rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-rustic_backend = { git = "https://github.com/brege/rustic_core.git", rev = "84add30", package = "rustic_backend" }
+rustic_backend = { git = "https://github.com/brege/rustic_core.git", rev = "84add30", package = "rustic_backend", features = ["clap"] }
 rustic_core = { git = "https://github.com/brege/rustic_core.git", rev = "84add30", package = "rustic_core", features = ["clap"] }
 simplelog = "0.12.2"
 tempfile = "3.23.0"
 tokio = { version = "1.49.0", default-features = false, features = ["rt-multi-thread"] }
+toml = "0.8"
 walkdir = "2.5.0"
 
 [dev-dependencies]

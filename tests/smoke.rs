@@ -54,7 +54,7 @@ fn require_binary(rel: &str, build_hint: &str) -> Result<PathBuf> {
 fn run_sak(binary: &Path, repo: &Path, source: &Path) -> Result<()> {
     let output = Command::new(binary)
         .arg("import")
-        .arg("--repo")
+        .arg("--repository")
         .arg(repo)
         .arg("--source")
         .arg(source)
