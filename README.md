@@ -36,7 +36,7 @@ Backing up the Laptop's data to some remote using a config file, say `~/.config/
 ```toml
 [repository]
 repository = "sftp:user@host:/backup/Laptop"
-password-file = "~/.config/rustic/.pass"
+password-file = "/home/user/.config/rustic/.pass"
 
 [[backup.snapshots]]
 sources = [
@@ -59,9 +59,9 @@ Lines in `globs` without a `!` prefix are explicit includes; lines with `!` are 
 
 ### Sak Pattern
 
-But what if you have multiple machines whose configs and databases need to be backed up periodically? This is time-hard data that's difficult to reproduce. Headless Linux distros are typically SSH server enabled at genesis, while devices like Linux laptops often do not have an SSH server enabled. Plus, a laptop is not "always on", so even if you did setup an SSH server on your laptop for your servers to Rustic-backup to, they cannot rely on your laptop being alive to perform the backup.
+But what if you have multiple machines whose configs and databases need to be backed up periodically? This is time-hard data that's difficult to reproduce. Headless Linux installs are typically SSH server enabled at genesis, while portable desktop devices like laptops with Linux installs often do not have an SSH server enabled. Plus, a laptop is not "always on", so even if you did setup an SSH server on your laptop for your servers to Rustic-backup to, they cannot rely on your laptop being alive to perform the backup.
 
-This is what I made **sak** for. Sak uses all of Rustic's features, the same TOML manifests as above, but the source lives on a remote host and the repository lives on the laptop. Your laptop can the pull Rustic backups at will.
+This is what **sak** was made for. Sak reuses Rustic's backend, credential, backup, and snapshot options inside Rustic's TOML shape, but the source lives on a remote host and the repository lives on the laptop. Your laptop can pull these backups at will on its own internal schedules.
 
 Keep one local repository per remote host.
 
@@ -75,8 +75,8 @@ Keep the source set beside each local repository in the same shape.
 
     ```toml
     [repository]
-    repository = "~/Backups/Unraid"
-    password-file = "~/Backups/Unraid/.sak-pass"
+    repository = "/home/user/Backups/Unraid"
+    password-file = "/home/user/Backups/Unraid/.sak-pass"
 
     [[backup.snapshots]]
     sources = [
@@ -96,8 +96,8 @@ Keep the source set beside each local repository in the same shape.
 
     ```toml
     [repository]
-    repository = "~/Backups/MiniPC"
-    password-file = "~/Backups/MiniPC/.sak-pass"
+    repository = "/home/user/Backups/MiniPC"
+    password-file = "/home/user/Backups/MiniPC/.sak-pass"
 
     [[backup.snapshots]]
     sources = [
@@ -115,7 +115,14 @@ Keep the source set beside each local repository in the same shape.
     ]
     ```
 
-The host prefix on each source path, `MiniPC:` and `Unraid:`, is the only structural difference from a standard rustic config. The `globs` key behaves identically in both tools.
+The host prefix on each source path, `MiniPC:` and `Unraid:`, is the only structural difference from a standard rustic-style source list. The `globs` key behaves identically in both tools.
+
+Run one config at a time:
+
+```bash
+sak backup --config /home/user/Backups/Unraid/sak.toml
+sak backup --config /home/user/Backups/MiniPC/sak.toml
+```
 
 ### Inspect
 
