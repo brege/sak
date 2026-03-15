@@ -1,7 +1,7 @@
 mod progress;
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     env, fs,
     path::{Path, PathBuf},
     str::FromStr,
@@ -118,8 +118,7 @@ impl RemoteSource {
 #[derive(Clone)]
 pub struct RemoteSourceReader {
     root: PathBuf,
-    entries: Vec<RemoteEntry>,
-    size: u64,
+    state: RemoteSourceState,
 }
 
 impl RemoteSourceReader {
@@ -139,16 +138,30 @@ impl RemoteSourceReader {
         filter_opts: LocalSourceFilterOptions,
     ) -> Result<Self> {
         let root = remote.root_path()?;
-        let entries = collect_remote_entries(op, &remote, &root, &excludes, &filter_opts)?;
-        let size = entries
-            .iter()
-            .filter(|entry| matches!(entry.node.node_type, NodeType::File))
-            .map(|entry| entry.node.meta.size)
-            .sum();
+        let stat = op
+            .stat(&remote.path)
+            .with_context(|| format!("failed to stat remote path {}", remote.path))?;
+
+        if stat.is_file() {
+            let entry = remote_source_entry(op, root.clone(), remote.path, &stat)?;
+            return Ok(Self {
+                root,
+                state: RemoteSourceState::File(Box::new(entry)),
+            });
+        }
+
+        if !stat.is_dir() {
+            bail!("unsupported remote path type: {}", remote.path);
+        }
+
         Ok(Self {
-            root,
-            entries,
-            size,
+            root: root.clone(),
+            state: RemoteSourceState::Dir {
+                op,
+                root,
+                root_remote: remote_dir_path(&remote.path),
+                filters: Arc::new(build_remote_filters(&excludes, &filter_opts)?),
+            },
         })
     }
 
@@ -159,33 +172,152 @@ impl RemoteSourceReader {
 
 impl ReadSource for RemoteSourceReader {
     type Open = RemoteOpen;
-    type Iter = std::vec::IntoIter<RusticResult<ReadSourceEntry<Self::Open>>>;
+    type Iter = RemoteEntries;
 
     fn size(&self) -> RusticResult<Option<u64>> {
-        Ok(Some(self.size))
+        Ok(match &self.state {
+            RemoteSourceState::File(entry) => Some(entry.node.meta.size),
+            RemoteSourceState::Dir { .. } => None,
+        })
     }
 
     fn entries(&self) -> Self::Iter {
-        self.entries
-            .iter()
-            .cloned()
-            .map(|entry| {
-                Ok(ReadSourceEntry {
-                    path: entry.path,
-                    node: entry.node,
-                    open: entry.open,
-                })
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
+        RemoteEntries::new(self.state.clone())
     }
 }
 
 #[derive(Clone)]
-struct RemoteEntry {
-    path: PathBuf,
-    node: Node,
-    open: Option<RemoteOpen>,
+enum RemoteSourceState {
+    File(Box<ReadSourceEntry<RemoteOpen>>),
+    Dir {
+        op: Arc<BlockingOperator>,
+        root: PathBuf,
+        root_remote: String,
+        filters: Arc<RemoteFilters>,
+    },
+}
+
+pub struct RemoteEntries {
+    inner: RemoteEntriesInner,
+}
+
+enum RemoteEntriesInner {
+    File(Box<Option<RusticResult<ReadSourceEntry<RemoteOpen>>>>),
+    Dir(RemoteSourceWalker),
+}
+
+impl RemoteEntries {
+    fn new(state: RemoteSourceState) -> Self {
+        let inner = match state {
+            RemoteSourceState::File(entry) => RemoteEntriesInner::File(Box::new(Some(Ok(*entry)))),
+            RemoteSourceState::Dir {
+                op,
+                root,
+                root_remote,
+                filters,
+            } => RemoteEntriesInner::Dir(RemoteSourceWalker::new(op, root, root_remote, filters)),
+        };
+        Self { inner }
+    }
+}
+
+impl Iterator for RemoteEntries {
+    type Item = RusticResult<ReadSourceEntry<RemoteOpen>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            RemoteEntriesInner::File(entry) => entry.take(),
+            RemoteEntriesInner::Dir(walker) => walker.next(),
+        }
+    }
+}
+
+struct RemoteSourceWalker {
+    op: Arc<BlockingOperator>,
+    root: PathBuf,
+    filters: Arc<RemoteFilters>,
+    dirs: VecDeque<String>,
+    pending: VecDeque<ReadSourceEntry<RemoteOpen>>,
+}
+
+impl RemoteSourceWalker {
+    fn new(
+        op: Arc<BlockingOperator>,
+        root: PathBuf,
+        root_remote: String,
+        filters: Arc<RemoteFilters>,
+    ) -> Self {
+        let mut dirs = VecDeque::new();
+        dirs.push_back(root_remote.clone());
+        Self {
+            op,
+            root,
+            filters,
+            dirs,
+            pending: VecDeque::new(),
+        }
+    }
+
+    fn fill_pending(&mut self) -> Result<bool> {
+        while self.pending.is_empty() {
+            let Some(dir) = self.dirs.pop_front() else {
+                return Ok(false);
+            };
+            if remote_dir_excluded(self.op.as_ref(), &dir, &self.filters.exclude_if_present) {
+                continue;
+            }
+            let mut listed = self
+                .op
+                .list_options(&dir, ListOptions::default())
+                .with_context(|| format!("failed to list remote path {dir}"))?;
+            listed.sort_by(|left, right| left.path().cmp(right.path()));
+            for entry in listed {
+                let trimmed = entry.path().trim_end_matches('/');
+                if trimmed == dir.trim_end_matches('/') {
+                    continue;
+                }
+                let Some(meta) =
+                    resolve_remote_meta(self.op.as_ref(), entry.path(), entry.metadata())?
+                else {
+                    continue;
+                };
+                let path = remote_entry_path(entry.path())?;
+                let node = remote_node(&path, &meta)?;
+                if !include_remote_entry(&path, &node, &self.root, &self.filters) {
+                    continue;
+                }
+                if node.node_type == NodeType::Dir {
+                    self.dirs.push_back(remote_dir_path(trimmed));
+                }
+                self.pending.push_back(ReadSourceEntry {
+                    path,
+                    open: node.is_file().then(|| RemoteOpen {
+                        op: self.op.clone(),
+                        path: entry.path().to_string(),
+                    }),
+                    node,
+                });
+            }
+        }
+        Ok(true)
+    }
+}
+
+impl Iterator for RemoteSourceWalker {
+    type Item = RusticResult<ReadSourceEntry<RemoteOpen>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.fill_pending() {
+            Ok(true) => self.pending.pop_front().map(Ok),
+            Ok(false) => None,
+            Err(err) => Some(Err(RusticError::with_source(
+                ErrorKind::InputOutput,
+                "Failed to iterate remote source entries.",
+                err,
+            )
+            .ask_report())),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -210,64 +342,6 @@ impl ReadSourceOpen for RemoteOpen {
                 .attach_context("path", self.path)
             })
     }
-}
-
-fn collect_remote_entries(
-    op: Arc<BlockingOperator>,
-    remote: &RemoteSource,
-    root: &Path,
-    excludes: &Excludes,
-    filter_opts: &LocalSourceFilterOptions,
-) -> Result<Vec<RemoteEntry>> {
-    let stat = op
-        .stat(&remote.path)
-        .with_context(|| format!("failed to stat remote path {}", remote.path))?;
-    let filters = build_remote_filters(excludes, filter_opts)?;
-
-    if stat.is_file() {
-        let entry = remote_file_entry(op, root.to_path_buf(), remote.path.clone(), &stat)?;
-        return Ok(include_remote_entry(&entry, root, &filters, &[])
-            .then_some(entry)
-            .into_iter()
-            .collect());
-    }
-
-    if !stat.is_dir() {
-        bail!("unsupported remote path type: {}", remote.path);
-    }
-
-    let root_path = remote_dir_path(&remote.path);
-    let entries = op
-        .list_options(
-            &root_path,
-            ListOptions {
-                recursive: true,
-                ..Default::default()
-            },
-        )
-        .with_context(|| format!("failed to list remote path {root_path}"))?
-        .into_iter()
-        .filter_map(|entry| {
-            let trimmed = entry.path().trim_end_matches('/');
-            if trimmed == root_path.trim_end_matches('/') {
-                return None;
-            }
-            Some(remote_list_entry(
-                op.clone(),
-                entry.path(),
-                entry.metadata(),
-            ))
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    let excluded_dirs = excluded_remote_dirs(&entries, root, &filters.exclude_if_present);
-    let mut entries = entries
-        .into_iter()
-        .filter(|entry| include_remote_entry(entry, root, &filters, &excluded_dirs))
-        .collect::<Vec<_>>();
-
-    entries.sort_by(|left, right| left.path.cmp(&right.path));
-    Ok(entries)
 }
 
 fn build_remote_filters(
@@ -332,26 +406,20 @@ fn build_remote_filters(
     })
 }
 
-fn include_remote_entry(
-    entry: &RemoteEntry,
-    root: &Path,
-    filters: &RemoteFilters,
-    excluded_dirs: &[PathBuf],
-) -> bool {
-    if excluded_dirs
-        .iter()
-        .any(|dir| is_under(entry.path.as_path(), dir))
-    {
-        return false;
-    }
+fn include_remote_entry(path: &Path, node: &Node, root: &Path, filters: &RemoteFilters) -> bool {
     if let Some(limit) = filters.exclude_larger_than
-        && entry.node.node_type == NodeType::File
-        && entry.node.meta.size > limit
+        && node.node_type == NodeType::File
+        && node.meta.size > limit
     {
         return false;
     }
 
-    match best_override_match(entry, root, &filters.overrides) {
+    match best_override_match(
+        path,
+        node.node_type == NodeType::Dir,
+        root,
+        &filters.overrides,
+    ) {
         Some(matched) if matched.is_whitelist() => true,
         Some(matched) if matched.is_ignore() => false,
         _ => true,
@@ -359,14 +427,13 @@ fn include_remote_entry(
 }
 
 fn best_override_match<'a>(
-    entry: &'a RemoteEntry,
+    path: &'a Path,
+    is_dir: bool,
     root: &Path,
     overrides: &'a Override,
 ) -> Option<Match<ignore::overrides::Glob<'a>>> {
-    let is_dir = entry.node.node_type == NodeType::Dir;
-    let full = overrides.matched(&entry.path, is_dir);
-    let rel = entry
-        .path
+    let full = overrides.matched(path, is_dir);
+    let rel = path
         .strip_prefix(root)
         .ok()
         .map(|path| overrides.matched(path, is_dir));
@@ -382,36 +449,12 @@ fn best_override_match<'a>(
     }
 }
 
-fn excluded_remote_dirs(entries: &[RemoteEntry], root: &Path, markers: &[String]) -> Vec<PathBuf> {
-    entries
-        .iter()
-        .filter_map(|entry| {
-            let name = entry.path.file_name()?.to_str()?;
-            if !markers.iter().any(|marker| marker == name) {
-                return None;
-            }
-            let parent = entry.path.parent()?;
-            Some(
-                parent
-                    .strip_prefix(root)
-                    .ok()
-                    .map(|rel| root.join(rel))
-                    .unwrap_or_else(|| parent.to_path_buf()),
-            )
-        })
-        .collect()
-}
-
-fn is_under(path: &Path, dir: &Path) -> bool {
-    path == dir || path.starts_with(dir)
-}
-
-fn remote_file_entry(
+fn remote_source_entry(
     op: Arc<BlockingOperator>,
     path: PathBuf,
     remote_path: String,
     meta: &opendal::Metadata,
-) -> Result<RemoteEntry> {
+) -> Result<ReadSourceEntry<RemoteOpen>> {
     let node = remote_node(&path, meta)?;
     let open = if node.is_file() {
         Some(RemoteOpen {
@@ -422,16 +465,7 @@ fn remote_file_entry(
         None
     };
 
-    Ok(RemoteEntry { path, node, open })
-}
-
-fn remote_list_entry(
-    op: Arc<BlockingOperator>,
-    remote_path: &str,
-    meta: &opendal::Metadata,
-) -> Result<RemoteEntry> {
-    let path = remote_entry_path(remote_path)?;
-    remote_file_entry(op, path, remote_path.to_string(), meta)
+    Ok(ReadSourceEntry { path, node, open })
 }
 
 fn remote_entry_path(path: &str) -> Result<PathBuf> {
@@ -477,6 +511,45 @@ fn remote_node(path: &Path, remote_meta: &opendal::Metadata) -> Result<Node> {
     };
 
     Ok(Node::new_node(name, node_type, meta))
+}
+
+fn resolve_remote_meta(
+    op: &BlockingOperator,
+    remote_path: &str,
+    meta: &opendal::Metadata,
+) -> Result<Option<opendal::Metadata>> {
+    if meta.mode() != EntryMode::Unknown {
+        return Ok(Some(meta.clone()));
+    }
+
+    let resolved = match op.stat(remote_path) {
+        Ok(meta) => meta,
+        Err(err)
+            if matches!(
+                err.kind(),
+                opendal::ErrorKind::NotFound | opendal::ErrorKind::PermissionDenied
+            ) =>
+        {
+            return Ok(None);
+        }
+        Err(err) => {
+            return Err(err).with_context(|| format!("failed to stat remote path {remote_path}"));
+        }
+    };
+
+    if resolved.mode() == EntryMode::Unknown {
+        return Ok(None);
+    }
+
+    Ok(Some(resolved))
+}
+
+fn remote_dir_excluded(op: &BlockingOperator, dir: &str, markers: &[String]) -> bool {
+    let dir = remote_dir_path(dir.trim_end_matches('/'));
+    markers.iter().any(|marker| {
+        let candidate = format!("{dir}{marker}");
+        op.stat(&candidate).is_ok()
+    })
 }
 
 fn is_remote_host(host: &str) -> bool {
