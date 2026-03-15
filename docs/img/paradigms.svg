@@ -79,12 +79,13 @@
 				.sm { font-size: 11px; }
 
 				.sub { border-radius: 4px; padding: 7px 0; text-align: center; font-size: 13px; background: var(--blue-f); border: 1.5px solid var(--blue-s); }
-				
+
 				.repo-box { border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+				.repo-box.green { background: var(--green-f); border: 1.5px solid var(--green-s); }
 				.repo-box.red { background: var(--red-f); border: 1.5px solid var(--red-s); }
 				.repo-box.purple { background: var(--purple-f); border: 1.5px solid var(--purple-s); }
 				.repo-box.yellow { background: var(--yellow-f); border: 1.5px solid var(--yellow-s); }
-				
+
 				h2 { font-size: 20px; font-weight: 700; margin-bottom: 15px; margin-top: 0; }
 			</style>
 
@@ -116,7 +117,7 @@
 						<div class="mono">-r sftp:user@host</div>
 						<div class="mono sm">$RESTIC_REPOSITORY</div>
 						<div class="mono sm">$RESTIC_PASSWORD</div>
-						<div class="repo-box red">
+						<div class="repo-box green">
 							<div class="mono" style="font-weight:600;">/backup/Laptop/</div>
 							<div class="mono">├── config</div>
 							<div class="mono">├── data</div>
@@ -132,6 +133,7 @@
 				<div class="flow">
 					<div class="panel green">
 						<div class="cap">laptop</div>
+						<div class="mono">-r sftp:user@unraid</div>
 						<div class="repo-box purple">
 							<div class="mono" style="font-weight:600;">~/Backups/Unraid/</div>
 							<div class="mono">├── config</div>
@@ -141,6 +143,7 @@
 							<div class="mono">├── locks</div>
 							<div class="mono">└── snapshots</div>
 						</div>
+						<div class="mono">-r sftp:user@minipc</div>
 						<div class="repo-box yellow">
 							<div class="mono" style="font-weight:600;">~/Backups/MiniPC/</div>
 							<div class="mono">├── config</div>
@@ -167,7 +170,6 @@
 					<div class="col">
 						<div class="panel purple">
 							<div class="cap">Unraid</div>
-							<div class="mono">-r sftp:user@unraid</div>
 							<div class="mono">.config/</div>
 							<div class="mono">db.sqlite3</div>
 							<div class="mono">/etc/nginx/</div>
@@ -175,7 +177,6 @@
 						</div>
 						<div class="panel yellow">
 							<div class="cap">MiniPC</div>
-							<div class="mono">-r sftp:user@minipc</div>
 							<div class="mono">/mnt/user/appdata/</div>
 							<div class="mono">/var/lib/plexmediaserver/</div>
 							<div class="mono">/boot/config/</div>

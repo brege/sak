@@ -6,11 +6,11 @@
 
 Rustic (and Restic) is designed to backup data on the local machine to a remote repository, typically through SSH, using Zstd compression, AES-256 encryption, de-duplicating backups and snapshotting for fast and efficient storage retrieval. It's an impressive stack.
 
-Sak uses [`rustic_core`](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local restic repository.
+Sak uses [rustic-core](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local Restic repository.
 
 ## Topology
 
-![paradigms](img/paradigms.svg)
+![paradigms](docs/img/paradigms.svg)
 
 ## Install
 
@@ -26,7 +26,7 @@ This example uses the device topology of the diagram above. We are backing up tw
 
 ### Rustic Paradigm
 
-Rustic, and Restic, are ran from the source machine (in this example, Laptop) and backups its data to a remote repository. What gets backed up is defined in a configuration TOML file containing
+Rustic, and Restic, are ran from the source machine (in this example, Laptop) and backs up its data to a remote repository. What gets backed up is defined in a configuration TOML file containing
 
 - `sources`, a list of paths to back up
 - `globs`, a separate list of filter patterns applied during traversal
@@ -55,9 +55,9 @@ globs = [
 ]
 ```
 
-Lines in `globs` without a `!` prefix are explicit includes; lines with `!` are excludes. Once a directory is excluded, files inside it cannot be re-included.
+Lines in `globs` without a `!` prefix are explicit includes; lines with `!` are excludes. Once a directory is excluded, files inside it cannot be re-included. The `**/` prefix is used here because the sources span multiple separate roots.
 
-### Sak Pattern
+### Sak Paradigm
 
 But what if you have multiple machines whose configs and databases need to be backed up periodically? This is time-hard data that's difficult to reproduce. Headless Linux installs are typically SSH server enabled at genesis, while portable desktop devices like laptops with Linux installs often do not have an SSH server enabled. Plus, a laptop is not "always on", so even if you did setup an SSH server on your laptop for your servers to Rustic-backup to, they cannot rely on your laptop being alive to perform the backup.
 
@@ -86,9 +86,9 @@ Keep the source set beside each local repository in the same shape.
         "Unraid:/LinuxISOs",
     ]
     globs = [
-        "!**/.cache",
-        "!**/*.tmp",
-        "!**/*.log",
+        "!.cache",
+        "!*.tmp",
+        "!*.log",
     ]
     ```
 
@@ -107,9 +107,8 @@ Keep the source set beside each local repository in the same shape.
         "MiniPC:/docker",
     ]
     globs = [
-        "!/mnt/user/appdata/**/cache",
-        "!/mnt/user/appdata/**/Cache",
-        "!/mnt/user/appdata/**/logs",
+        "!**/cache",
+        "!**/logs",
         "!/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Cache",
         "!**/*.tmp",
     ]
@@ -126,12 +125,11 @@ sak backup --config /home/user/Backups/MiniPC/sak.toml
 
 ### Inspect
 
-List snapshots in the laptop-local `MiniPC` repository.
+List snapshots while in the laptop-local `MiniPC` repository.
 
 ```bash
-restic --repo ~/Backups/MiniPC \
-    --password-file ~/Backups/MiniPC/.sak-pass \
-    snapshots
+cd ~/Backups/MiniPC
+restic --repo . --password-file .sak-pass snapshots
 ```
 
 Inspect the latest snapshot in the laptop-local `Unraid` repository.
@@ -157,7 +155,7 @@ Rustic and Restic write the exact same repository format and can be used interch
 
 ### Documentation
 
-- [Comparison of Rustic vs. Restic](https://rustic.cli.rs/docs/comparison-restic.html): Rustic is not a port of Restic and this page is invaluable in understanding the feature set differences betwee the two.
+- [Comparison of Rustic vs. Restic](https://rustic.cli.rs/docs/comparison-restic.html): Rustic is not a port of Restic and this page is invaluable in understanding the feature set differences between the two.
 - [Rustic Configuration File](https://rustic.cli.rs/docs/commands/init/configuration_file.html)
   covers `[[backup.snapshots]]`, `glob-file`, and profile usage.
 - [Rustic Config TOML Reference](https://github.com/rustic-rs/rustic/blob/main/config/README.md)
