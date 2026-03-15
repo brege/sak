@@ -170,16 +170,16 @@
 							<div class="mono">-r sftp:user@unraid</div>
 							<div class="mono">.config/</div>
 							<div class="mono">db.sqlite3</div>
-							<div class="mono">/srv/music</div>
+							<div class="mono">/etc/nginx/</div>
 							<div class="mono">LinuxISOs/</div>
 						</div>
 						<div class="panel yellow">
 							<div class="cap">MiniPC</div>
 							<div class="mono">-r sftp:user@minipc</div>
 							<div class="mono">/mnt/user/appdata/</div>
-							<div class="mono">/mnt/user/Media/</div>
+							<div class="mono">/var/lib/plexmediaserver/</div>
 							<div class="mono">/boot/config/</div>
-							<div class="mono">docker/</div>
+							<div class="mono">/docker/</div>
 						</div>
 					</div>
 				</div>
