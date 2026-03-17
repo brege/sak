@@ -4,7 +4,10 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand, ValueHint};
 use rustic_backend::BackendOptions;
 use rustic_core::{BackupOptions, CredentialOptions, RepositoryOptions, SnapshotOptions};
-use sak::{ImportOptions, SourceSpec, import_local_tree, init_logging};
+use sak::{
+    ImportOptions, ServerConfig, SourceSpec, import_local_tree, init_logging, init_server_logging,
+    run_server,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "sak")]
@@ -17,6 +20,13 @@ struct Cli {
 enum Command {
     Import(Box<ImportArgs>),
     Backup(BackupArgs),
+    Server(ServerArgs),
+}
+
+#[derive(Debug, Parser)]
+struct ServerArgs {
+    #[arg(value_hint = ValueHint::DirPath)]
+    path: String,
 }
 
 #[derive(Debug, Parser)]
@@ -38,6 +48,14 @@ struct ImportArgs {
 
     #[command(flatten)]
     snapshot: SnapshotOptions,
+
+    /// SSH key for connecting to the remote server agent
+    #[arg(long, value_hint = ValueHint::FilePath)]
+    server_key: Option<PathBuf>,
+
+    /// Path to sak-server binary on the remote (default: .local/bin/sak-server)
+    #[arg(long, value_hint = ValueHint::FilePath)]
+    server_binary: Option<PathBuf>,
 }
 
 #[derive(Debug, Parser)]
@@ -64,9 +82,10 @@ struct SakRepositorySection {
     credential_opts: CredentialOptions,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 struct SakBackupSection {
     snapshots: Vec<SakSnapshotEntry>,
+    server: Option<ServerConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -78,16 +97,34 @@ struct SakSnapshotEntry {
 }
 
 fn main() -> Result<()> {
-    init_logging();
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Import(args) => run_import(*args),
-        Command::Backup(args) => run_backup(args),
+        Command::Import(args) => {
+            init_logging();
+            run_import(*args)
+        }
+        Command::Backup(args) => {
+            init_logging();
+            run_backup(args)
+        }
+        Command::Server(args) => {
+            init_server_logging().context("failed to initialize server log file")?;
+            run_server(&args.path)
+        }
     }
 }
 
 fn run_import(args: ImportArgs) -> Result<()> {
+    let server = if args.server_key.is_some() || args.server_binary.is_some() {
+        Some(ServerConfig {
+            key: args.server_key,
+            binary: args.server_binary,
+        })
+    } else {
+        None
+    };
+
     let snapshot = import_local_tree(&ImportOptions {
         backend_opts: args.backend,
         repo_opts: args.repo_opts,
@@ -95,6 +132,7 @@ fn run_import(args: ImportArgs) -> Result<()> {
         source: args.source.parse::<SourceSpec>()?,
         backup: args.backup,
         snapshot: default_snapshot_command(args.snapshot, "sak import"),
+        server,
     })?;
 
     println!("{}", snapshot.id);
@@ -108,7 +146,8 @@ fn run_backup(args: BackupArgs) -> Result<()> {
         .with_context(|| format!("failed to parse {}", args.config.display()))?;
 
     let SakConfig { repository, backup } = cfg;
-    for snap_cfg in backup.map(|backup| backup.snapshots).unwrap_or_default() {
+    let (snapshots, server_cfg) = backup.map(|b| (b.snapshots, b.server)).unwrap_or_default();
+    for snap_cfg in snapshots {
         let (backup_opts, snapshot_opts) = split_snapshot_options(&snap_cfg.opts)?;
         for source in snap_cfg.sources {
             let snapshot = import_local_tree(&ImportOptions {
@@ -118,6 +157,7 @@ fn run_backup(args: BackupArgs) -> Result<()> {
                 source: source.parse::<SourceSpec>()?,
                 backup: backup_opts.clone(),
                 snapshot: default_snapshot_command(snapshot_opts.clone(), "sak backup"),
+                server: server_cfg.clone(),
             })?;
             println!("{source} {}", snapshot.id);
         }

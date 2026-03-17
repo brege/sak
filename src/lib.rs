@@ -1,4 +1,8 @@
+pub mod deploy;
 mod progress;
+mod proto;
+mod server;
+mod server_source;
 
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -30,7 +34,9 @@ use rustic_core::{
 
 use crate::progress::UiProgress;
 
-pub use progress::init_logging;
+pub use deploy::ServerConfig;
+pub use progress::{init_logging, init_server_logging};
+pub use server::run_server;
 
 #[derive(Debug, Clone)]
 pub struct ImportOptions {
@@ -40,6 +46,7 @@ pub struct ImportOptions {
     pub source: SourceSpec,
     pub backup: BackupOptions,
     pub snapshot: SnapshotOptions,
+    pub server: Option<ServerConfig>,
 }
 
 pub fn import_local_tree(opts: &ImportOptions) -> Result<SnapshotFile> {
@@ -60,6 +67,21 @@ fn import_local_path(opts: &ImportOptions, source_path: &Path) -> Result<Snapsho
 fn import_remote_path(opts: &ImportOptions, remote: &RemoteSource) -> Result<SnapshotFile> {
     let repo = open_or_init_repo(&opts.backend_opts, &opts.repo_opts, &opts.credential_opts)?
         .to_indexed_ids()?;
+
+    if let Some(server_cfg) = &opts.server {
+        let root = remote.root_path()?;
+        let session = deploy::ServerSession::connect(&remote.host, server_cfg)?;
+        let channel = session.start_server(&remote.path)?;
+        let source = server_source::SakServerSource::new(
+            root,
+            opts.backup.excludes.clone(),
+            opts.backup.ignore_filter_opts.clone(),
+            channel,
+        )?;
+        let snap = opts.snapshot.to_snapshot()?;
+        return Ok(repo.backup_source(&opts.backup, source.backup_root(), &source, snap)?);
+    }
+
     let source = RemoteSourceReader::new(
         remote.clone(),
         opts.backup.excludes.clone(),

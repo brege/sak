@@ -1,5 +1,6 @@
 use std::{
     fmt::Write,
+    fs::OpenOptions,
     io::IsTerminal,
     sync::{Arc, Mutex, Once},
     time::{Duration, Instant},
@@ -9,7 +10,7 @@ use bytesize::ByteSize;
 use indicatif::{HumanDuration, ProgressBar, ProgressState, ProgressStyle};
 use log::{LevelFilter, info};
 use rustic_core::{Progress, ProgressBars, ProgressType, RusticProgress};
-use simplelog::{ColorChoice, Config, TermLogger, TerminalMode};
+use simplelog::{ColorChoice, Config, TermLogger, TerminalMode, WriteLogger};
 
 const INTERACTIVE_INTERVAL: Duration = Duration::from_millis(100);
 const LOG_INTERVAL: Duration = Duration::from_secs(10);
@@ -209,4 +210,25 @@ pub fn init_logging() {
             ColorChoice::Auto,
         );
     });
+}
+
+pub fn init_server_logging() -> std::io::Result<()> {
+    static INIT: Once = Once::new();
+    let mut init_err = None;
+    INIT.call_once(|| {
+        let path =
+            std::env::var("SAK_SERVER_LOG").unwrap_or_else(|_| "/tmp/sak-server.log".to_string());
+        match OpenOptions::new().create(true).append(true).open(&path) {
+            Ok(file) => {
+                let _ = WriteLogger::init(LevelFilter::Info, Config::default(), file);
+            }
+            Err(err) => {
+                init_err = Some(err);
+            }
+        }
+    });
+    if let Some(err) = init_err {
+        return Err(err);
+    }
+    Ok(())
 }

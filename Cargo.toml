@@ -9,11 +9,15 @@ doctest = false
 
 [dependencies]
 anyhow = "1.0.100"
+bincode = "1"
 bytesize = "2.3.0"
 clap = { version = "4.5.60", features = ["derive"] }
+crossbeam-channel = "0.5"
 ignore = "0.4.25"
 indicatif = "0.18.0"
+jiff = "0.2"
 log = "0.4.29"
+nix = { version = "0.31", features = ["user"] }
 opendal = { version = "0.55.0", features = ["blocking", "services-fs", "services-sftp", "layers-throttle"] }
 rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -29,3 +33,11 @@ walkdir = "2.5.0"
 [dev-dependencies]
 flate2 = "1.1.5"
 tar = "0.4.44"
+
+[profile.dev]
+incremental = false
+debug = 1
+
+[profile.test]
+incremental = false
+debug = 1
