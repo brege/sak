@@ -81,9 +81,9 @@ Lines in `globs` without a `!` prefix are explicit includes; lines with `!` are 
 
 ### Sak Paradigm
 
-But what if you have multiple machines whose configs and databases need to be backed up periodically? This is time-hard data that's difficult to reproduce. Headless Linux installs are typically SSH server enabled at genesis, while portable desktop devices like laptops with Linux installs often do not have an SSH server enabled. Plus, a laptop is not "always on", so even if you did setup an SSH server on your laptop for your servers to Rustic-backup to, they cannot rely on your laptop being alive to perform the backup.
+But what if you have multiple machines whose configs and databases need to be backed up periodically? This is time-hard data that's difficult to reproduce. Headless Linux installs are typically SSH server enabled at genesis, while portable desktop devices like laptops with Linux installs often do not have an SSH *server* enabled. Plus, a laptop is not "always on", so even if you did setup an SSH server on your laptop for your servers to Rustic-backup to, they cannot rely on your laptop being alive to perform the backup.
 
-This is what **sak** was made for. Sak reuses Rustic's backend, credential, backup, and snapshot options inside Rustic's TOML shape, but the source lives on a remote host and the repository lives on the laptop. Your laptop can pull these backups at will on its own internal schedules.
+This is what **sak** was made for. Sak reuses Restic's backend, credential, backup, and snapshot options inside Rustic's TOML shape, but the source lives on a remote host and the repository lives on the laptop. Your laptop can pull these backups at will on its own internal schedules.
 
 Keep one local repository per remote host.
 
@@ -173,19 +173,21 @@ restic --repo ~/Backups/Unraid \
 - [Rustic Core](https://github.com/rustic-rs/rustic_core)
 - [Fork of Rustic Core used by Sak](https://github.com/brege/rustic_core)
 
-Rustic and Restic write the exact same repository format and can be used interchangeably against the same repo. Do not run `prune` from both tools simultaneously; read-only commands like `snapshots` and `ls` are fine from either.
+Rustic and Restic write the exact same repository format and can be used interchangeably against the same repo.
 
 ### Documentation
 
 - [Comparison of Rustic vs. Restic](https://rustic.cli.rs/docs/comparison-restic.html): Rustic is not a port of Restic and this page is invaluable in understanding the feature set differences between the two.
 - [Rustic Configuration File](https://rustic.cli.rs/docs/commands/init/configuration_file.html)
-  covers `[[backup.snapshots]]`, `glob-file`, and profile usage.
+  is one of Rustic's key feature-adds over Restic, besides being written in Rust instead of Go.
 - [Rustic Config TOML Reference](https://github.com/rustic-rs/rustic/blob/main/config/README.md)
   canonical key-by-key TOML reference; where `globs` and `glob-file` are formally defined.
 - [Discussion: backup using config and glob](https://github.com/rustic-rs/rustic/discussions/1194)
   has worked examples of the `!` negation pattern with glob files.
 
 ## Related Projects
+
+Restic is so efficient, easy to retrieve oops-deleted files, and idiomatic for those work a lot with Git. There's only so far you can take rsync based backups, and the reduction of reproducible junk to produce minimal backups have been a game you play with very little return.
 
 ### [dil](https://github.com/brege/dil)
 
