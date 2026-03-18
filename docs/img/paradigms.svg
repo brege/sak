@@ -1,4 +1,4 @@
-<svg fill="none" viewBox="0 0 850 840" width="850" height="840" xmlns="http://www.w3.org/2000/svg">
+<svg fill="none" viewBox="0 0 850 920" width="850" height="920" xmlns="http://www.w3.org/2000/svg">
 	<foreignObject width="100%" height="100%">
 		<div xmlns="http://www.w3.org/1999/xhtml">
 			<style>
@@ -47,7 +47,7 @@
 				.container {
 					font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
 					color: var(--ink);
-					padding: 24px 24px 0 24px;
+					padding: 24px;
 				}
 
 				.flow {
@@ -57,9 +57,13 @@
 					margin-bottom: 50px;
 				}
 
-				.col { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+				.col { display: flex; flex-direction: column; gap: 8px; }
 				.arrow-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 48px; }
 				.arrow-col span { font-size: 20px; color: var(--border); line-height: 1; }
+				.flow.sak .arrow-col.repo-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 72px; }
+				.flow.sak .arrow-col.repo-arrows span + span { margin-top: 172px; }
+				.flow.sak .arrow-col.machine-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 98px; }
+				.flow.sak .arrow-col.machine-arrows span + span { margin-top: 147px; }
 
 				.panel { border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border: 2px solid; }
 				.cap { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
@@ -79,6 +83,11 @@
 				.sm { font-size: 11px; }
 
 				.sub { border-radius: 4px; padding: 7px 0; text-align: center; font-size: 13px; background: var(--blue-f); border: 1.5px solid var(--blue-s); }
+				.sub.pop { background: color-mix(in srgb, var(--blue-f) 78%, #ffffff 22%); border: 2px solid color-mix(in srgb, var(--blue-s) 85%, #c8dcff 15%); color: #ffffff; font-weight: 700; letter-spacing: 0.2px; }
+
+				@media (prefers-color-scheme: dark) {
+					.sub.pop { color: #111111; }
+				}
 
 				.repo-box { border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
 				.repo-box.green { background: var(--green-f); border: 1.5px solid var(--green-s); }
@@ -90,7 +99,7 @@
 			</style>
 
 			<div class="container">
-				<h2>Restic / Rustic paradigm</h2>
+				<h2>Restic paradigm</h2>
 				<div class="flow">
 					<div class="panel green">
 						<div class="cap">laptop</div>
@@ -129,8 +138,8 @@
 					</div>
 				</div>
 
-				<h2>Sak paradigm</h2>
-				<div class="flow">
+				<h2>Sak + modded Rustic paradigm</h2>
+				<div class="flow sak">
 					<div class="panel green">
 						<div class="cap">laptop</div>
 						<div class="mono">-r sftp:user@unraid</div>
@@ -155,17 +164,20 @@
 						</div>
 					</div>
 
-					<div class="arrow-col"><span>←</span><span>←</span></div>
+					<div class="arrow-col repo-arrows"><span>←</span><span>←</span></div>
 
 					<div class="panel blue">
-						<div class="cap">restic engine</div>
+						<div class="cap">sak + mod-rustic engine</div>
 						<div class="sub">chunking</div>
 						<div class="sub">hashing + dedup</div>
 						<div class="sub">encryption</div>
 						<div class="sub">snapshot</div>
+						<div class="sub pop">toml config</div>
+						<div class="sub pop">sequencing</div>
+						<div class="sub pop">telemetry</div>
 					</div>
 
-					<div class="arrow-col"><span>←</span><span>←</span></div>
+					<div class="arrow-col machine-arrows"><span>←</span><span>←</span></div>
 
 					<div class="col">
 						<div class="panel purple">

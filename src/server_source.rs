@@ -203,7 +203,8 @@ fn filter_entries(
         }
         match wire_to_entry(wire, request_tx) {
             Ok(entry) => {
-                if !include_remote_entry(&entry.path, &entry.node, root, filters) {
+                let is_root = entry.path == root;
+                if !is_root && !include_remote_entry(&entry.path, &entry.node, root, filters) {
                     if entry.node.is_dir() {
                         excluded_dirs.push(entry.path);
                     }

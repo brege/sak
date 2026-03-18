@@ -4,9 +4,31 @@
 
 ## About
 
-Rustic (and Restic) is designed to backup data on the local machine to a remote repository, typically through SSH, using Zstd compression, AES-256 encryption, de-duplicating backups and snapshotting for fast and efficient storage retrieval. It's an impressive stack.
+Restic defines the storage engine and repository format. Rustic builds on that with config-driven execution. Sak keeps that config shape and engine compatibility, but flips the direction: remote sources -> local repositories (pull instead of push).
 
-Sak uses [rustic-core](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local Restic repository.
+Sak uses [rustic-core](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local Restic-format repository.
+
+## Layers
+
+See [Comparison of Rustic vs. Restic](https://rustic.cli.rs/docs/comparison-restic.html) for fine-grained details.
+
+### Restic
+
+- Storage Engine
+- Repo Format
+- Chunking / Dedup / Encryption / Snapshots
+
+### Rustic
+
+- Restic re-implemented in Rust
+- Adds TOML config + Execution surface + Telemetry 
+
+### Sak
+
+- Pulls data into local repos instead of pushing to remotes
+- Maps remote sources into local repos
+- Adds on to rustic-core
+
 
 ## Topology
 

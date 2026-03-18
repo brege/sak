@@ -216,8 +216,10 @@ pub fn init_server_logging() -> std::io::Result<()> {
     static INIT: Once = Once::new();
     let mut init_err = None;
     INIT.call_once(|| {
-        let path =
-            std::env::var("SAK_SERVER_LOG").unwrap_or_else(|_| "/tmp/sak-server.log".to_string());
+        let path = std::env::var("SAK_SERVER_LOG").unwrap_or_else(|_| {
+            let uid = nix::unistd::getuid();
+            format!("/tmp/sak-server-{uid}.log")
+        });
         match OpenOptions::new().create(true).append(true).open(&path) {
             Ok(file) => {
                 let _ = WriteLogger::init(LevelFilter::Info, Config::default(), file);

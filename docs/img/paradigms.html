@@ -84,6 +84,28 @@ body {
   user-select: none;
 }
 
+.flow.sak .arrow-col.repo-arrows {
+  align-self: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  padding-top: 72px;
+}
+
+.flow.sak .arrow-col.repo-arrows span + span {
+  margin-top: 172px;
+}
+
+.flow.sak .arrow-col.machine-arrows {
+  align-self: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  padding-top: 98px;
+}
+
+.flow.sak .arrow-col.machine-arrows span + span {
+  margin-top: 147px;
+}
+
 .panel {
   border-radius: 6px;
   padding: 12px 14px;
@@ -122,6 +144,20 @@ body {
   color: var(--ink);
 }
 
+.sub.pop {
+  background: color-mix(in srgb, var(--blue-f) 78%, #ffffff 22%);
+  border: 2px solid color-mix(in srgb, var(--blue-s) 85%, #c8dcff 15%);
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sub.pop {
+    color: #111111;
+  }
+}
+
 .repo-box {
   border-radius: 4px;
   padding: 8px 10px;
@@ -137,7 +173,7 @@ body {
 </head>
 <body>
 
-<p style="font-size:20px; font-weight:700; margin-bottom:10px; color:var(--ink);">Restic / Rustic paradigm</p>
+<p style="font-size:20px; font-weight:700; margin-bottom:10px; color:var(--ink);">Restic paradigm</p>
 <div class="flow">
 
   <div class="panel green">
@@ -178,8 +214,8 @@ body {
 
 </div>
 
-<p style="font-size:20px; font-weight:700; margin-bottom:10px; color:var(--ink);">Sak paradigm</p>
-<div class="flow">
+<p style="font-size:20px; font-weight:700; margin-bottom:10px; color:var(--ink);">Sak + modded Rustic paradigm</p>
+<div class="flow sak">
 
   <div class="panel green">
     <div class="cap">laptop</div>
@@ -205,17 +241,20 @@ body {
     </div>
   </div>
 
-  <div class="arrow-col"><span>←</span><span>←</span></div>
+  <div class="arrow-col repo-arrows"><span>←</span><span>←</span></div>
 
   <div class="panel blue">
-    <div class="cap">restic engine</div>
+    <div class="cap">sak + modded rustic engine</div>
     <div class="sub">chunking</div>
     <div class="sub">hashing + dedup</div>
     <div class="sub">encryption</div>
     <div class="sub">snapshot</div>
+    <div class="sub pop">toml config</div>
+    <div class="sub pop">sequencing</div>
+    <div class="sub pop">telemetry</div>
   </div>
 
-  <div class="arrow-col"><span>←</span><span>←</span></div>
+  <div class="arrow-col machine-arrows"><span>←</span><span>←</span></div>
 
   <div class="col">
     <div class="panel purple">
