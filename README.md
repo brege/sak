@@ -2,41 +2,26 @@
 
 *Rustic... but in reverse!*
 
-## About
-
-Restic defines the storage engine and repository format. Rustic builds on that with config-driven execution. Sak keeps that config shape and engine compatibility, but flips the direction: remote sources -> local repositories (pull instead of push).
-
 Sak uses [rustic-core](https://github.com/rustic-rs/rustic_core) through a small [fork](https://github.com/brege/rustic_core) patched to enable backing up remote source trees into a local Restic-format repository.
-
-## Layers
-
-See [Comparison of Rustic vs. Restic](https://rustic.cli.rs/docs/comparison-restic.html) for fine-grained details.
-
-### Restic
-
-- Storage Engine
-- Repo Format
-- Chunking / Dedup / Encryption / Snapshots
-
-### Rustic
-
-- Restic re-implemented in Rust
-- Adds TOML config + Execution surface + Telemetry 
-
-### Sak
-
-- Pulls data into local repos instead of pushing to remotes
-- Maps remote sources into local repos
-- Adds on to rustic-core
-
 
 ## Topology
 
-![paradigms](docs/img/paradigms.svg)
+[Restic](https://github.com/restic/restic) defines the storage engine and repository format, using
+chunking, deduplication, encryption, and snapshots for efficient backups. [Rustic](https://github.com/rustic-rs/rustic) builds on that with config-driven execution via TOML manifest, execution sequencing, and better telemetry.
+
+### Restic / Rustic
+
+![restic](docs/img/restic.svg)
+
+### Sak
+
+![sak](docs/img/sak.svg)
+
+**Sak** keeps that config shape and engine compatibility, but flips the direction: remote sources are backed up into local repositories by **pulling**, not pushing.
 
 ## Install
 
-Install `sak` from GitHub.
+Install from GitHub.
 
 ```bash
 cargo install --git https://github.com/brege/sak --bin sak
@@ -44,16 +29,25 @@ cargo install --git https://github.com/brege/sak --bin sak
 
 ## Usage
 
-This example uses the device topology of the diagram above. We are backing up two machines, Unraid and MiniPC, and the Laptop is the destination for the backups from which you run Sak.
+This example assumes the device topology of the diagrams above. We are backing up two machines, Unraid and MiniPC, and the Laptop is the destination for the backups from which you run Sak.
 
-### Rustic Paradigm
+### Rustic
 
-Rustic, and Restic, are ran from the source machine (in this example, Laptop) and backs up its data to a remote repository. What gets backed up is defined in a configuration TOML file containing
+For the Rustic / Restic, the **laptop ⇒ remote/backend** mirroring runs from the source machine and backs up to a remote repository.
 
+What gets backed up is defined in a configuration TOML file, which is special to rustic, containing
+
+- `repository`, the path to the repository
+- `password-file`, the path to the password file
 - `sources`, a list of paths to back up
 - `globs`, a separate list of filter patterns applied during traversal
 
-Backing up the Laptop's data to some remote using a config file, say `~/.config/rustic/laptop.toml`, can look like:
+Backing up the Laptop's data to some remote using a TOML config file.
+
+<details>
+<summary><b>Show Laptop's Rustic TOML</b></summary>
+
+### `~/.config/rustic/laptop.toml`
 
 ```toml
 [repository]
@@ -77,13 +71,17 @@ globs = [
 ]
 ```
 
+</details>
+
 Lines in `globs` without a `!` prefix are explicit includes; lines with `!` are excludes. Once a directory is excluded, files inside it cannot be re-included. The `**/` prefix is used here because the sources span multiple separate roots.
 
-### Sak Paradigm
+### Sak
 
 But what if you have multiple machines whose configs and databases need to be backed up periodically? This is time-hard data that's difficult to reproduce. Headless Linux installs are typically SSH server enabled at genesis, while portable desktop devices like laptops with Linux installs often do not have an SSH *server* enabled. Plus, a laptop is not "always on", so even if you did setup an SSH server on your laptop for your servers to Rustic-backup to, they cannot rely on your laptop being alive to perform the backup.
 
 This is what **sak** was made for. Sak reuses Restic's backend, credential, backup, and snapshot options inside Rustic's TOML shape, but the source lives on a remote host and the repository lives on the laptop. Your laptop can pull these backups at will on its own internal schedules.
+
+#### laptop ⇐ {Unraid, MiniPC}
 
 Keep one local repository per remote host.
 
@@ -93,48 +91,58 @@ mkdir -p ~/Backups/MiniPC ~/Backups/Unraid
 
 Keep the source set beside each local repository in the same shape.
 
-1. `~/Backups/Unraid/sak.toml`
+<details>
+<summary><b>Show Unraid's sak.toml</b></summary>
 
-    ```toml
-    [repository]
-    repository = "/home/user/Backups/Unraid"
-    password-file = "/home/user/Backups/Unraid/.sak-pass"
+### `~/Backups/Unraid/sak.toml`
 
-    [[backup.snapshots]]
-    sources = [
-        "Unraid:/.config",
-        "Unraid:/db.sqlite3",
-        "Unraid:/etc/nginx",
-        "Unraid:/LinuxISOs",
-    ]
-    globs = [
-        "!.cache",
-        "!*.tmp",
-        "!*.log",
-    ]
-    ```
+```toml
+[repository]
+repository = "/home/user/Backups/Unraid"
+password-file = "/home/user/Backups/Unraid/.sak-pass"
 
-2. `~/Backups/MiniPC/sak.toml`
+[[backup.snapshots]]
+sources = [
+    "Unraid:/.config",
+    "Unraid:/db.sqlite3",
+    "Unraid:/etc/nginx",
+    "Unraid:/LinuxISOs",
+]
+globs = [
+    "!.cache",
+    "!*.tmp",
+    "!*.log",
+]
+```
 
-    ```toml
-    [repository]
-    repository = "/home/user/Backups/MiniPC"
-    password-file = "/home/user/Backups/MiniPC/.sak-pass"
+</details>
 
-    [[backup.snapshots]]
-    sources = [
-        "MiniPC:/mnt/user/appdata",
-        "MiniPC:/var/lib/plexmediaserver",
-        "MiniPC:/boot/config",
-        "MiniPC:/docker",
-    ]
-    globs = [
-        "!**/cache",
-        "!**/logs",
-        "!/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Cache",
-        "!**/*.tmp",
-    ]
-    ```
+<details>
+<summary><b>Show MiniPC's sak.toml</b></summary>
+
+### `~/Backups/MiniPC/sak.toml`
+
+```toml
+[repository]
+repository = "/home/user/Backups/MiniPC"
+password-file = "/home/user/Backups/MiniPC/.sak-pass"
+
+[[backup.snapshots]]
+sources = [
+    "MiniPC:/mnt/user/appdata",
+    "MiniPC:/var/lib/plexmediaserver",
+    "MiniPC:/boot/config",
+    "MiniPC:/docker",
+]
+globs = [
+    "!**/cache",
+    "!**/logs",
+    "!/var/lib/plexmediaserver/Library/Application Support/Plex Media Server/Cache",
+    "!**/*.tmp",
+]
+```
+
+</details>
 
 The host prefix on each source path, `MiniPC:` and `Unraid:`, is the only structural difference from a standard rustic-style source list. The `globs` key behaves identically in both tools.
 
@@ -164,16 +172,7 @@ restic --repo ~/Backups/Unraid \
 
 `rustic` can be used interchangeably with `restic` for these checks.
 
-## References
-
-### Repositories
-
-- [Restic](https://github.com/restic/restic)
-- [Rustic](https://github.com/rustic-rs/rustic)
-- [Rustic Core](https://github.com/rustic-rs/rustic_core)
-- [Fork of Rustic Core used by Sak](https://github.com/brege/rustic_core)
-
-Rustic and Restic write the exact same repository format and can be used interchangeably against the same repo.
+## Resources
 
 ### Documentation
 
@@ -185,17 +184,16 @@ Rustic and Restic write the exact same repository format and can be used interch
 - [Discussion: backup using config and glob](https://github.com/rustic-rs/rustic/discussions/1194)
   has worked examples of the `!` negation pattern with glob files.
 
-## Related Projects
+### Related Projects
 
-Restic is so efficient, easy to retrieve oops-deleted files, and idiomatic for those work a lot with Git. There's only so far you can take rsync based backups, and the reduction of reproducible junk to produce minimal backups have been a game you play with very little return.
+Restic is incredibly efficient, easy to retrieve oops-deleted files, and idiomatic for those who work a lot with Git. Previously, before switching my thinking over to the restic paradigm, I did a lot of my backing up with [rsync](https://rsync.samba.org/). This sync from my remotes was noisy and required building up finer and finer filters so my portable backups were slim.
 
-### [dil](https://github.com/brege/dil)
+Here are my related projects:
 
-Finds and cleans build litter: `node_modules`, `__pycache__`, LaTeX cruft (`*.aux`, `*.synctex.gz`), and equivalents across many languages and frameworks. Useful to run before a backup to avoid archiving garbage.
+1. I made [**ilma**](https://github.com/brege/ilma), an over-engineered Bash script for multi-machine encrypted backups using monolithic archives (zst, tar, rsync, gpg). No de-duplication, but the spiritual predecessor to Sak.
 
-### [ilma](https://github.com/brege/ilma)
+2. Then [**dil**](https://github.com/brege/dil), ported from ilma's pruner, detects and cleans project build litter: `node_modules`, `__pycache__`, LaTeX cruft (`*.aux`, `*.synctex.gz`), and equivalents across many languages and frameworks. Useful to run before a backup to avoid archiving garbage.
 
-An over-engineered Bash script for multi-machine encrypted backups using monolithic archives (zst, tar, rsync, gpg). No de-duplication, but the spiritual predecessor to Sak.
 
 ## License
 

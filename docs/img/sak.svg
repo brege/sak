@@ -1,4 +1,4 @@
-<svg fill="none" viewBox="0 0 850 920" width="850" height="920" xmlns="http://www.w3.org/2000/svg">
+<svg fill="none" viewBox="0 0 850 447" width="850" height="447" xmlns="http://www.w3.org/2000/svg">
 	<foreignObject width="100%" height="100%">
 		<div xmlns="http://www.w3.org/1999/xhtml">
 			<style>
@@ -11,9 +11,6 @@
 					--blue-s: #3355aa;
 					--blue-f: rgba(100,140,220,0.15);
 					--blue-cap: #3355aa;
-					--red-s: #aa3333;
-					--red-f: rgba(220,100,100,0.15);
-					--red-cap: #aa3333;
 					--purple-s: #7755bb;
 					--purple-f: rgba(150,100,220,0.15);
 					--purple-cap: #7755bb;
@@ -32,9 +29,6 @@
 						--blue-s: #6688dd;
 						--blue-f: rgba(100,140,220,0.18);
 						--blue-cap: #6688dd;
-						--red-s: #dd6666;
-						--red-f: rgba(220,100,100,0.18);
-						--red-cap: #dd6666;
 						--purple-s: #aa88ee;
 						--purple-f: rgba(170,130,240,0.18);
 						--purple-cap: #aa88ee;
@@ -47,23 +41,22 @@
 				.container {
 					font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
 					color: var(--ink);
-					padding: 24px;
+					padding: 12px 24px 4px;
 				}
 
 				.flow {
 					display: grid;
 					grid-template-columns: 260px 36px 200px 36px 260px;
 					align-items: center;
-					margin-bottom: 50px;
 				}
 
 				.col { display: flex; flex-direction: column; gap: 8px; }
 				.arrow-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 48px; }
 				.arrow-col span { font-size: 20px; color: var(--border); line-height: 1; }
-				.flow.sak .arrow-col.repo-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 72px; }
-				.flow.sak .arrow-col.repo-arrows span + span { margin-top: 172px; }
-				.flow.sak .arrow-col.machine-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 98px; }
-				.flow.sak .arrow-col.machine-arrows span + span { margin-top: 147px; }
+				.arrow-col.repo-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 72px; }
+				.arrow-col.repo-arrows span + span { margin-top: 172px; }
+				.arrow-col.machine-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 98px; }
+				.arrow-col.machine-arrows span + span { margin-top: 147px; }
 
 				.panel { border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border: 2px solid; }
 				.cap { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
@@ -72,74 +65,23 @@
 				.green .cap { color: var(--green-cap); }
 				.blue { background: var(--blue-f); border-color: var(--blue-s); }
 				.blue .cap { color: var(--blue-cap); }
-				.red { background: var(--red-f); border-color: var(--red-s); }
-				.red .cap { color: var(--red-cap); }
 				.purple { background: var(--purple-f); border-color: var(--purple-s); }
 				.purple .cap { color: var(--purple-cap); }
 				.yellow { background: var(--yellow-f); border-color: var(--yellow-s); }
 				.yellow .cap { color: var(--yellow-cap); }
 
 				.mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre; }
-				.sm { font-size: 11px; }
 
 				.sub { border-radius: 4px; padding: 7px 0; text-align: center; font-size: 13px; background: var(--blue-f); border: 1.5px solid var(--blue-s); }
-				.sub.pop { background: color-mix(in srgb, var(--blue-f) 78%, #ffffff 22%); border: 2px solid color-mix(in srgb, var(--blue-s) 85%, #c8dcff 15%); color: #ffffff; font-weight: 700; letter-spacing: 0.2px; }
-
-				@media (prefers-color-scheme: dark) {
-					.sub.pop { color: #111111; }
-				}
+				.sub.pop { border-width: 3px; font-weight: 800; text-decoration: underline; }
 
 				.repo-box { border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
-				.repo-box.green { background: var(--green-f); border: 1.5px solid var(--green-s); }
-				.repo-box.red { background: var(--red-f); border: 1.5px solid var(--red-s); }
 				.repo-box.purple { background: var(--purple-f); border: 1.5px solid var(--purple-s); }
 				.repo-box.yellow { background: var(--yellow-f); border: 1.5px solid var(--yellow-s); }
-
-				h2 { font-size: 20px; font-weight: 700; margin-bottom: 15px; margin-top: 0; }
 			</style>
 
 			<div class="container">
-				<h2>Restic paradigm</h2>
 				<div class="flow">
-					<div class="panel green">
-						<div class="cap">laptop</div>
-						<div class="mono">~/Documents</div>
-						<div class="mono">~/Pictures</div>
-						<div class="mono">~/.config</div>
-						<div class="mono">~/.mozilla</div>
-					</div>
-
-					<div class="arrow-col"><span>→</span></div>
-
-					<div class="panel blue">
-						<div class="cap">restic engine</div>
-						<div class="sub">chunking</div>
-						<div class="sub">hashing + dedup</div>
-						<div class="sub">encryption</div>
-						<div class="sub">snapshot</div>
-					</div>
-
-					<div class="arrow-col"><span>→</span></div>
-
-					<div class="panel red">
-						<div class="cap">backend</div>
-						<div class="mono">-r sftp:user@host</div>
-						<div class="mono sm">$RESTIC_REPOSITORY</div>
-						<div class="mono sm">$RESTIC_PASSWORD</div>
-						<div class="repo-box green">
-							<div class="mono" style="font-weight:600;">/backup/Laptop/</div>
-							<div class="mono">├── config</div>
-							<div class="mono">├── data</div>
-							<div class="mono">├── index</div>
-							<div class="mono">├── keys</div>
-							<div class="mono">├── locks</div>
-							<div class="mono">└── snapshots</div>
-						</div>
-					</div>
-				</div>
-
-				<h2>Sak + modded Rustic paradigm</h2>
-				<div class="flow sak">
 					<div class="panel green">
 						<div class="cap">laptop</div>
 						<div class="mono">-r sftp:user@unraid</div>
@@ -167,7 +109,7 @@
 					<div class="arrow-col repo-arrows"><span>←</span><span>←</span></div>
 
 					<div class="panel blue">
-						<div class="cap">sak + mod-rustic engine</div>
+						<div class="cap">rustic + sak mods</div>
 						<div class="sub">chunking</div>
 						<div class="sub">hashing + dedup</div>
 						<div class="sub">encryption</div>
