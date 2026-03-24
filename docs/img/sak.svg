@@ -1,4 +1,4 @@
-<svg fill="none" viewBox="0 0 850 447" width="850" height="447" xmlns="http://www.w3.org/2000/svg">
+<svg fill="none" viewBox="0 0 850 500" width="850" height="500" xmlns="http://www.w3.org/2000/svg">
 	<foreignObject width="100%" height="100%">
 		<div xmlns="http://www.w3.org/1999/xhtml">
 			<style>
@@ -53,13 +53,13 @@
 				.col { display: flex; flex-direction: column; gap: 8px; }
 				.arrow-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 48px; }
 				.arrow-col span { font-size: 20px; color: var(--border); line-height: 1; }
-				.arrow-col.repo-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 72px; }
-				.arrow-col.repo-arrows span + span { margin-top: 172px; }
-				.arrow-col.machine-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 98px; }
-				.arrow-col.machine-arrows span + span { margin-top: 147px; }
+				.arrow-col.repo-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 88px; }
+				.arrow-col.repo-arrows span + span { margin-top: 185px; }
+				.arrow-col.machine-arrows { align-self: stretch; justify-content: flex-start; gap: 0; padding-top: 108px; }
+				.arrow-col.machine-arrows span + span { margin-top: 155px; }
 
 				.panel { border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border: 2px solid; }
-				.cap { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+				.cap { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
 
 				.green { background: var(--green-f); border-color: var(--green-s); }
 				.green .cap { color: var(--green-cap); }
@@ -70,9 +70,9 @@
 				.yellow { background: var(--yellow-f); border-color: var(--yellow-s); }
 				.yellow .cap { color: var(--yellow-cap); }
 
-				.mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre; }
+				.mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 14px; line-height: 1.5; white-space: pre; }
 
-				.sub { border-radius: 4px; padding: 7px 0; text-align: center; font-size: 13px; background: var(--blue-f); border: 1.5px solid var(--blue-s); }
+				.sub { border-radius: 4px; padding: 8px 0; text-align: center; font-size: 15px; background: var(--blue-f); border: 1.5px solid var(--blue-s); }
 				.sub.pop { border-width: 3px; font-weight: 800; text-decoration: underline; }
 
 				.repo-box { border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
@@ -127,7 +127,7 @@
 							<div class="mono">.config/</div>
 							<div class="mono">db.sqlite3</div>
 							<div class="mono">/etc/nginx/</div>
-							<div class="mono">LinuxISOs/</div>
+							<div class="mono">media/</div>
 						</div>
 						<div class="panel yellow">
 							<div class="cap">MiniPC</div>
