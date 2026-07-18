@@ -242,6 +242,7 @@ fn backup_option_keys() -> BTreeSet<String> {
         "no-require-git",
         "custom-ignorefiles",
         "exclude-if-present",
+        "exclude-if-xattr",
         "one-file-system",
         "exclude-larger-than",
     ]

@@ -12,7 +12,7 @@ use anyhow::Result;
 use rustic_core::{
     ErrorKind, Excludes, LocalSourceFilterOptions, ReadSource, ReadSourceEntry, ReadSourceOpen,
     RusticError, RusticResult,
-    node::{Metadata, Node, NodeType},
+    repofile::{Metadata, Node, NodeType},
 };
 
 use crate::{

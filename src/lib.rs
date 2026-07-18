@@ -28,8 +28,7 @@ use rustic_core::{
     BackupOptions, ConfigOptions, CredentialOptions, ErrorKind, Excludes, KeyOptions,
     LocalSourceFilterOptions, PathList, ReadSource, ReadSourceEntry, ReadSourceOpen, Repository,
     RepositoryOptions, RusticError, RusticResult, SnapshotOptions,
-    node::{Metadata, Node, NodeType},
-    repofile::SnapshotFile,
+    repofile::{Metadata, Node, NodeType, SnapshotFile},
 };
 
 use crate::progress::UiProgress;
@@ -79,7 +78,8 @@ fn import_remote_path(opts: &ImportOptions, remote: &RemoteSource) -> Result<Sna
             channel,
         )?;
         let snap = opts.snapshot.to_snapshot()?;
-        return Ok(repo.backup_source(&opts.backup, source.backup_root(), &source, snap)?);
+        let paths = [source.backup_root().to_path_buf()];
+        return Ok(repo.archive(&opts.backup, &source, snap, &paths)?);
     }
 
     let source = RemoteSourceReader::new(
@@ -88,7 +88,8 @@ fn import_remote_path(opts: &ImportOptions, remote: &RemoteSource) -> Result<Sna
         opts.backup.ignore_filter_opts.clone(),
     )?;
     let snap = opts.snapshot.to_snapshot()?;
-    Ok(repo.backup_source(&opts.backup, source.backup_root(), &source, snap)?)
+    let paths = [source.backup_root().to_path_buf()];
+    Ok(repo.archive(&opts.backup, &source, snap, &paths)?)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

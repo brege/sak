@@ -60,12 +60,8 @@ fn remote_source_reader_imports_without_staging() -> Result<()> {
     snap_opts.label = Some("fixture".to_string());
     snap_opts = snap_opts.add_tags("fixture")?;
 
-    let snapshot = repo.backup_source(
-        &backup_opts,
-        reader.backup_root(),
-        &reader,
-        snap_opts.to_snapshot()?,
-    )?;
+    let paths = [reader.backup_root().to_path_buf()];
+    let snapshot = repo.archive(&backup_opts, &reader, snap_opts.to_snapshot()?, &paths)?;
 
     assert_eq!(snapshot.paths.to_string(), "src");
     assert_eq!(snapshot.hostname, "beelink");
