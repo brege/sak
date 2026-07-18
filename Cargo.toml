@@ -9,7 +9,7 @@ doctest = false
 
 [dependencies]
 anyhow = "1.0.100"
-bincode = "1"
+bincode = { version = "2.0.1", default-features = false, features = ["std", "serde"] }
 bytesize = "2.3.0"
 clap = { version = "4.5.60", features = ["derive"] }
 crossbeam-channel = "0.5"

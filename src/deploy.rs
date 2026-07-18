@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use crate::server_source::ServerChannel;
+use crate::{SERVER_PROTOCOL, server_source::ServerChannel};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -64,31 +64,42 @@ impl ServerSession {
 
     fn ensure_binary(&self) -> Result<()> {
         let binary = self.config.binary_path();
-        let check_cmd = format!(
-            "{} --version 2>/dev/null && echo ok || echo missing",
-            binary.display()
-        );
-
-        let output = std::process::Command::new("ssh")
-            .args(self.ssh_args(&check_cmd))
-            .output()
-            .context("failed to check remote sak-server version")?;
-
-        let out = String::from_utf8_lossy(&output.stdout);
-        let current = env!("CARGO_PKG_VERSION");
-
-        if out.contains(current) {
+        if self.remote_protocol(&binary)?.as_deref() == Some(SERVER_PROTOCOL) {
             return Ok(());
         }
 
-        log::debug!(
-            "version check for {}: expected {:?}, got {:?}",
-            self.host,
-            current,
-            out
-        );
         log::info!("uploading sak-server to {}:{}", self.host, binary.display());
-        self.upload_binary(&binary)
+        self.upload_binary(&binary)?;
+
+        let protocol = self.remote_protocol(&binary)?;
+        if protocol.as_deref() != Some(SERVER_PROTOCOL) {
+            bail!(
+                "server protocol check failed for {}: expected {SERVER_PROTOCOL:?}, got {protocol:?}",
+                self.host
+            );
+        }
+        Ok(())
+    }
+
+    fn remote_protocol(&self, binary: &Path) -> Result<Option<String>> {
+        let check_cmd = format!("{} server-protocol 2>/dev/null || true", binary.display());
+        let output = std::process::Command::new("ssh")
+            .args(self.ssh_args(&check_cmd))
+            .output()
+            .context("failed to check remote sak-server protocol")?;
+
+        if !output.status.success() {
+            bail!(
+                "server protocol command failed for {}: {}",
+                self.host,
+                output.status
+            );
+        }
+
+        let protocol = String::from_utf8(output.stdout)
+            .context("remote sak-server protocol is not valid UTF-8")?;
+        let protocol = protocol.trim();
+        Ok((!protocol.is_empty()).then(|| protocol.to_string()))
     }
 
     fn upload_binary(&self, binary: &Path) -> Result<()> {

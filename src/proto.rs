@@ -3,8 +3,12 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+
+pub const SERVER_PROTOCOL: &str = "sak-server/2";
+
+const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024;
 
 /// Node type variants sent over the wire from sak-server.
 /// Symlink carries raw link target bytes to handle non-unicode paths.
@@ -49,7 +53,7 @@ pub enum ServerMsg {
     Error(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ClientMsg {
     ReadFile(PathBuf),
     Shutdown,
@@ -57,8 +61,12 @@ pub enum ClientMsg {
 
 /// Write a length-prefixed bincode frame to `w`.
 pub fn write_frame<W: Write, T: Serialize>(w: &mut W, msg: &T) -> Result<()> {
-    let bytes = bincode::serialize(msg)?;
-    w.write_all(&(bytes.len() as u32).to_le_bytes())?;
+    let bytes = bincode::serde::encode_to_vec(msg, bincode::config::standard())?;
+    if bytes.len() > MAX_FRAME_SIZE {
+        bail!("frame exceeds maximum size of {MAX_FRAME_SIZE} bytes");
+    }
+    let len = u32::try_from(bytes.len())?;
+    w.write_all(&len.to_le_bytes())?;
     w.write_all(&bytes)?;
     Ok(())
 }
@@ -75,7 +83,54 @@ pub fn read_frame<R: Read + ?Sized, T: DeserializeOwned>(r: &mut R) -> Result<Op
         };
     }
     let len = u32::from_le_bytes(len_buf) as usize;
+    if len > MAX_FRAME_SIZE {
+        bail!("frame exceeds maximum size of {MAX_FRAME_SIZE} bytes");
+    }
     let mut buf = vec![0u8; len];
     r.read_exact(&mut buf)?;
-    Ok(Some(bincode::deserialize(&buf)?))
+    let (msg, consumed) = bincode::serde::decode_from_slice(&buf, bincode::config::standard())?;
+    if consumed != buf.len() {
+        bail!("frame contains trailing bytes");
+    }
+    Ok(Some(msg))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trips_frame() -> Result<()> {
+        let mut frame = Vec::new();
+        write_frame(&mut frame, &ClientMsg::ReadFile(PathBuf::from("/srv/data")))?;
+
+        let decoded = read_frame::<_, ClientMsg>(&mut frame.as_slice())?;
+        match decoded {
+            Some(ClientMsg::ReadFile(path)) => assert_eq!(path, PathBuf::from("/srv/data")),
+            _ => panic!("unexpected decoded message"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_oversized_frame() {
+        let len = u32::try_from(MAX_FRAME_SIZE + 1).unwrap();
+        let err = read_frame::<_, ClientMsg>(&mut len.to_le_bytes().as_slice()).unwrap_err();
+
+        assert!(err.to_string().contains("frame exceeds maximum size"));
+    }
+
+    #[test]
+    fn rejects_trailing_bytes() -> Result<()> {
+        let bytes =
+            bincode::serde::encode_to_vec(ClientMsg::Shutdown, bincode::config::standard())?;
+        let len = u32::try_from(bytes.len() + 1)?;
+        let mut frame = len.to_le_bytes().to_vec();
+        frame.extend(bytes);
+        frame.push(0);
+
+        let err = read_frame::<_, ClientMsg>(&mut frame.as_slice()).unwrap_err();
+        assert!(err.to_string().contains("frame contains trailing bytes"));
+        Ok(())
+    }
 }

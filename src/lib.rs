@@ -35,6 +35,7 @@ use crate::progress::UiProgress;
 
 pub use deploy::ServerConfig;
 pub use progress::{init_logging, init_server_logging};
+pub use proto::SERVER_PROTOCOL;
 pub use server::run_server;
 
 #[derive(Debug, Clone)]

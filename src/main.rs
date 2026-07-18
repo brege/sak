@@ -5,8 +5,8 @@ use clap::{Parser, Subcommand, ValueHint};
 use rustic_backend::BackendOptions;
 use rustic_core::{BackupOptions, CredentialOptions, RepositoryOptions, SnapshotOptions};
 use sak::{
-    ImportOptions, ServerConfig, SourceSpec, import_local_tree, init_logging, init_server_logging,
-    run_server,
+    ImportOptions, SERVER_PROTOCOL, ServerConfig, SourceSpec, import_local_tree, init_logging,
+    init_server_logging, run_server,
 };
 
 #[derive(Debug, Parser)]
@@ -21,6 +21,8 @@ enum Command {
     Import(Box<ImportArgs>),
     Backup(BackupArgs),
     Server(ServerArgs),
+    #[command(hide = true)]
+    ServerProtocol,
 }
 
 #[derive(Debug, Parser)]
@@ -111,6 +113,10 @@ fn main() -> Result<()> {
         Command::Server(args) => {
             init_server_logging().context("failed to initialize server log file")?;
             run_server(&args.path)
+        }
+        Command::ServerProtocol => {
+            println!("{SERVER_PROTOCOL}");
+            Ok(())
         }
     }
 }
